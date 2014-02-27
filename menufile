@@ -1,0 +1,75 @@
+[debian]
+	title	= Debian
+	type	= submenu
+[fast]
+	under	= debian
+	title	= Install Debian (Fast)
+	class	= install,debian,gnu-linux,gnu,os
+	type	= linux16
+	kernel	= /tftpboot/debian-installer/${arch}/linux
+	command	= DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
+	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
+[expert]
+	under	= debian
+	title	= Install Debian (Expert)
+	class	= install,debian,gnu-linux,gnu,os
+	type	= linux16
+	kernel	= /tftpboot/debian-installer/${arch}/linux
+	command	= priority=low DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
+	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
+[utilities]
+	title	= Utilities
+	type	= submenu
+[shell]
+	title	= Enter iPXE shell
+	type	= exit
+	exit	= shell
+	under	= utilities
+[config]
+	title	= Config
+	type	= exit
+	exit	= config
+	under	= utilities
+[gparted]
+	title	= gparted
+	class	= live,debian,gnu-linux,gnu,os
+	type	= linux16
+	kernel	= /tftpboot/gparted/vmlinuz
+	command	= boot=live username=user config quiet noswap noeject nosplash fetch=http://${pxe_default_server}/gparted/filesystem.squashfs
+	initrd	= /tftpboot/gparted/initrd.img
+	under	= utilities
+[mt86]
+	title	= Memory test (memtest86)
+	type	= linux16
+	kernel	= /tftpboot/memtest86.bin
+	under	= utilities
+[mtp86]
+	under	= utilities
+	title	= Memory test (memtest86+)
+	type	= submenu
+[mtp86c]
+	under	= mtp86
+	title	= Memory test (memtest86+)
+	type	= linux16
+	kernel	= /tftpboot/memtest86+.bin
+[mtp86s]
+	under	= mtp86
+	title	= Memory test (memtest86+, serial console 115200)
+	type	= linux16
+	kernel	= /tftpboot/memtest86+.bin
+	command	= console=ttyS0,115200n8
+[mtp86m]
+	under	= mtp86
+	title	= Memory test (memtest86+, experimental multiboot)
+	type	= multiboot
+	kernel	= /tftpboot/memtest86+_multiboot.bin
+[mtp86ms]
+	under	= mtp86
+	title	= Memory test (memtest86+, serial console 115200, experimental multiboot)
+	type	= multiboot
+	kernel	= /tftpboot/memtest86+_multiboot.bin
+	command	= console=ttyS0,115200n8
+[reboot]
+	title	= reboot
+	type	= exit
+	exit	= reboot

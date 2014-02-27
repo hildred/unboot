@@ -1,0 +1,9 @@
+
+console --picture splash.pgm ||
+set pxe_default_server ${next-server}
+cpuid --ext 29 && set arch amd64 || set arch i386
+cpuid 6 && set pae yes ||
+cpuid --ecx 5 && set vmx yes ||
+cpuid --ext --ecx 2 && set svm yes ||
+isset ${vmx} || isset ${svm} && set hw_virt yes ||
+

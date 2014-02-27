@@ -1,0 +1,291 @@
+#!/usr/bin/perl
+use warnings;
+use strict;
+
+sub do_menu($$\*;$$);
+my %i=(
+	grub=>{
+		exit=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			return if 'shell'eq$e->{exit};
+			return if 'config'eq$e->{exit};
+
+			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(' );
+			print {$h} join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+			print {$h} qq( {\n),('	'x$o),qq(	$e->{exit}\n),('	'x$o),qq(}\n);
+		},
+		kfreebsd=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(' );
+			print {$h} join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+			print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading kernel ...'\n),('	'x$o);
+			print {$h} qq(	$e->{type}	$e->{kernel}\n);
+			print {$h} ('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	kfreebsd_module $e->{initrd} type=mfs_root\n) if defined $e->{initrd};
+			print {$h} map {('	'x$o),qq(	set $_\n)} split / /, $e->{command} if defined $e->{command};
+			print {$h} ('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
+		},
+		memdisk=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(' );
+			print {$h} join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+			print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading memdisk ...'\n),('	'x$o);
+			print {$h} qq(	linux16	/memdisk);
+			print {$h} qq( $e->{command}) if defined $e->{command};
+			print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	initrd16	$e->{initrd}) if defined $e->{initrd};
+			print {$h} qq(\n),('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
+		},
+		submenu=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} ('	'x$o),q(submenu '),$e->{title},q(' );
+			print {$h} join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+			print {$h} qq( {\n);
+			do_menu(grub=>$e->{tag},*$h,$t,$o+1);
+			print {$h} ('	'x$o),qq(}\n);
+		}
+	},
+	pxelinux=>{
+	},
+	ipxe2=>{
+		exit=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} q(:),$e->{tag},"\n",$e->{exit},qq( || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+		},
+		memdisk=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} q(:),$e->{tag};
+			print {$h} qq(\necho	'Loading kernel ...'\n);
+			print {$h} qq(kernel	../tftpboot/memdisk);
+			print {$h} qq( $e->{command}) if defined $e->{command};
+			print {$h} qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$e->{initrd}) if defined $e->{initrd};
+			print {$h} qq( || goto debug-$e->{tag}\nimgstat\necho	'Booting ...'\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+		},
+		kfreebsd=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} q(:),$e->{tag};
+			print {$h} qq(\necho	'Loading kernel ...'\nimgstat\nshell\n);
+	print {$h} qq(kernel	$e->{kernel});
+	print {$h} qq( $e->{command}) if defined $e->{command};
+	print {$h} qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$e->{initrd}) if defined $e->{initrd};
+	print {$h} map {qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
+	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	'Booting ...'\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+		},
+		submenu=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} q(:),$e->{tag};
+			print {$h} qq(\nmenu --name $e->{tag} $e->{title}\n);
+			do_menu(ipxe1=>$e->{tag},*$h,$e->{tag},$o+1);
+			print {$h} qq(item --menu $e->{tag} $e->{under}	Back to Parrent menu\n);
+			print {$h} qq(choose --menu $e->{tag} target || goto $e->{under}\nmenu --name $e->{tag} --delete\ngoto \${target}\n\n);
+		},
+	},
+);
+$i{grub}{basic}=sub{
+	my $h=shift; #handle
+	my $e=shift; #entry
+	my $t=shift;
+	my $o=shift;
+
+	my $t2;
+	if('linux16'eq$e->{type}){
+		$t2='initrd16';
+	}elsif('linux'eq$e->{type}){
+		$t2='initrd';
+	}elsif('multiboot'eq$e->{type}){
+		$t2='error';
+	}elsif('ipxelong'eq$e->{type}){
+		return
+	}elsif($i{grub}{$e->{type}}){
+		return $i{grub}{$e->{type}}($h,$e,$t,$o)
+	}else{
+		warn qq(unknown type $e->{type});
+	}
+
+	warn unless defined $e->{kernel};
+	print {$h} ('	'x$o),q(menuentry '),$e->{title},q(' );
+	print {$h} join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+	print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading kernel ...'\n),('	'x$o);
+	print {$h} qq(	$e->{type}	$e->{kernel});
+	print {$h} qq( $e->{command}) if defined $e->{command};
+	print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	$t2	$e->{initrd}) if defined $e->{initrd};
+	print {$h} qq(\n),('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
+};
+$i{ipxe1}{basic}=sub{
+	my $h=shift; #handle
+	my $e=shift; #entry
+	my $t=shift;
+	my $o=shift;
+
+	if($i{ipxe1}{$e->{type}}){
+		return $i{ipxe1}{$e->{type}}($h,$e,$t,$o)
+	}elsif('submenu'eq$e->{type}){
+	}elsif('linux16'eq$e->{type}){
+	}elsif('linux'eq$e->{type}){
+	}elsif('memdisk'eq$e->{type}){
+	}elsif('exit'eq$e->{type}){
+	}elsif('multiboot'eq$e->{type}){
+	}elsif('ipxelong'eq$e->{type}){
+	}elsif('kfreebsd'eq$e->{type}){
+	}else{
+		warn qq(unknown type $e->{type});
+	}
+
+	print {$h} q(item ),($t?"--menu $t ":''),$e->{tag},qq(	$e->{title}\n);
+};
+$i{ipxe2}{basic}=sub{
+	my $h=shift; #handle
+	my $e=shift; #entry
+	my $t=shift;
+	my $o=shift;
+
+	if($i{ipxe2}{$e->{type}}){
+		return $i{ipxe2}{$e->{type}}($h,$e,$t,$o)
+	}elsif('linux16'eq$e->{type}){
+	}elsif('linux'eq$e->{type}){
+	}elsif('multiboot'eq$e->{type}){
+	}elsif('ipxelong'eq$e->{type}){
+	}elsif('kfreebsd'eq$e->{type}){
+		return;
+	}else{
+		warn qq(unknown type $e->{type});
+	}
+
+	print {$h} q(:),$e->{tag};
+	print {$h} qq(\necho	'Loading kernel ...'\n);
+	print {$h} qq(kernel	$e->{kernel});
+	print {$h} qq( $e->{command}) if defined $e->{command};
+	print {$h} qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$e->{initrd}) if defined $e->{initrd};
+	print {$h} map {qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
+	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	'Booting ...'\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+};
+sub entry($\*$;$$){
+	my $t=shift; #target
+	#my $h=shift; #handle
+	#my $e=shift; #entry
+	#my $t=shift;
+	#my $o=shift;
+
+	return $i{$t}{basic}(@_);
+}
+sub out($\*){
+	my $t=shift; #target
+	my $h=shift; #handle
+
+	print {$h} qq(#!$t\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by netmenubuilder.\n#\n\n### BEGIN $0: $ARGV ###\n);
+	open my $lib, '<', $t.'.lib' or die;
+	print {$h} $_ while(<$lib>);
+	close $lib;
+	$i{$t}{out}($h);
+	print {$h} qq(### END $0: $ARGV ###\n);
+}
+my @order;
+my $count;
+$i{pxelinux}{out}=sub (\*){
+	my $h=shift;
+
+	do_menu(pxelinux=>menu=>*h,menu=>0);
+};
+$i{grub}{out}=sub (\*){
+	my $h=shift;
+
+	do_menu(grub=>menu=>*$h,menu=>0);
+	foreach my $e (@order){
+		next unless defined $e;
+	}
+};
+sub do_menu($$\*;$$){
+	my $g=shift;
+	my $m=shift;
+	my $h=shift;
+	my $t=shift;
+	my $o=shift;
+
+	$o=0 unless defined $o;
+	foreach my $e (@order){
+		next unless defined $e;
+		unless(defined $e->{type}){
+			warn 'undefined type for entry';
+			$e=undef;
+			next;
+		}
+		next unless $e->{under}eq$m;
+		entry($g,*$h,$e,$t,$o);
+	}
+}
+$i{ipxe}{out}=sub (\*){
+	my $h=shift;
+
+	print {$h} qq(:menu\nmenu --name menu\n);
+	do_menu(ipxe1=>menu=>*$h,menu=>0);
+	print {$h} qq(choose --menu menu target || exit\nmenu --name menu --delete\ngoto \${target}\n\n);
+	foreach my $e (@order){
+		next unless defined $e;
+		unless(defined $e->{type}){
+			warn 'undefined type for entry';
+			next;
+		}
+		entry('ipxe2',*$h,$e,menu=>0);
+	}
+};
+my $mode=shift;
+while (<>){
+	next if /^[ 	]*[#;]/;
+	next if m!^[ 	]*//!;
+	next if m!^[ 	]*$!;
+	if(/^\[([0-9a-zA-Z]+)\]/){
+		$count++;
+		$order[$count]{tag}=$1;
+	}elsif($count){
+		s!^[ 	]*!!;
+		s![ 	]*$!!;
+		if(/^([0-9a-zA-Z]+)[ 	]*=[ 	]*(.*)$/){
+			$order[$count]{lc($1)}=$2;
+		}else{
+			warn $_;
+			die die die 'bad format';
+		}
+	}else{
+		warn $_;
+		die die die 'bad format';
+	}
+}
+foreach my $e (@order){
+	next unless defined $e;
+	$e->{under}='menu' unless(defined $e->{under});
+}
+out($mode=>*STDOUT);
