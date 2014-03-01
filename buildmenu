@@ -60,6 +60,27 @@ my %i=(
 		}
 	},
 	pxelinux=>{
+		submenu=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			print {$h} ('	'x$o),q(menu begin ),$e->{tag},qq(\n);
+			print {$h} ('	'x$o),q(	include debian-installer/boot-screens/stdmenu.cfg),qq(\n);
+			unless(defined $e->{hotkey}){
+			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/){
+			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/){
+			}elsif($e->{title}=~s/($e->{hotkey})/^$1/){
+			}
+			print {$h} ('	'x$o),q(	menu title ),$e->{lable},qq(\n) if defined $e->{lable};;
+			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};;
+			print {$h} ('	'x$o),q(	label back),$e->{tag},qq(\n);
+			print {$h} ('	'x$o),q(		menu label ^Back..),qq(\n);
+			print {$h} ('	'x$o),q(		menu exit),qq(\n);
+			do_menu(pxelinux=>$e->{tag},*$h,$t,$o+1);
+			print {$h} ('	'x$o),qq(menu end\n);
+		}
 	},
 	ipxe2=>{
 		exit=>sub{
@@ -93,12 +114,13 @@ my %i=(
 
 			print {$h} q(:),$e->{tag};
 			print {$h} qq(\necho	'Loading kernel ...'\nimgstat\nshell\n);
-	print {$h} qq(kernel	$e->{kernel});
-	print {$h} qq( $e->{command}) if defined $e->{command};
-	print {$h} qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$e->{initrd}) if defined $e->{initrd};
-	print {$h} map {qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
-	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	'Booting ...'\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
-	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+				warn "unfinished code";
+				print {$h} qq(kernel	$e->{kernel});
+				print {$h} qq( $e->{command}) if defined $e->{command};
+				print {$h} qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$e->{initrd}) if defined $e->{initrd};
+				print {$h} map {qq( || goto debug-$e->{tag}\necho	'Loading initial ramdisk ...'\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
+				print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	'Booting ...'\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+				print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
 		},
 		submenu=>sub{
 			my $h=shift; #handle
@@ -114,12 +136,45 @@ my %i=(
 		},
 	},
 );
+$i{pxelinux}{basic}=sub{
+	my $h=shift; #handle
+	my $e=shift; #entry
+	my $t=shift;
+	my $o=shift;
+
+	my $t2;
+	if('linux16'eq$e->{type}){
+	}elsif('linux'eq$e->{type}){
+	}elsif('multiboot'eq$e->{type}){
+	}elsif('ipxelong'eq$e->{type}){
+		return
+	}elsif('exit'eq$e->{type}){
+		return
+	}else{
+		warn qq(unknown type $e->{type});
+	}
+
+	warn unless defined $e->{kernel};
+	print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
+	print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+	print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
+	unless(defined $e->{hotkey}){
+	}elsif($e->{title}=~s/^($e->{hotkey})/^$1/){
+	}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/){
+	}elsif($e->{title}=~s/($e->{hotkey})/^$1/){
+	}
+	print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n);
+	print {$h} ('	'x$o),q(	kernel ),$e->{kernel},qq(\n);
+	print {$h} ('	'x$o),q(	initrd ),$e->{initrd},qq(\n) if defined $e->{initrd};
+	print {$h} ('	'x$o),q(	append ),$e->{command},qq(\n) if defined $e->{command};
+};
 $i{grub}{basic}=sub{
 	my $h=shift; #handle
 	my $e=shift; #entry
 	my $t=shift;
 	my $o=shift;
 
+	#todo hotkey, default ###
 	my $t2;
 	if('linux16'eq$e->{type}){
 		$t2='initrd16';
@@ -150,8 +205,8 @@ $i{ipxe1}{basic}=sub{
 	my $t=shift;
 	my $o=shift;
 
-	if($i{ipxe1}{$e->{type}}){
-		return $i{ipxe1}{$e->{type}}($h,$e,$t,$o)
+	if('kfreebsd'eq$e->{type}){
+		return;
 	}elsif('submenu'eq$e->{type}){
 	}elsif('linux16'eq$e->{type}){
 	}elsif('linux'eq$e->{type}){
@@ -159,12 +214,11 @@ $i{ipxe1}{basic}=sub{
 	}elsif('exit'eq$e->{type}){
 	}elsif('multiboot'eq$e->{type}){
 	}elsif('ipxelong'eq$e->{type}){
-	}elsif('kfreebsd'eq$e->{type}){
 	}else{
 		warn qq(unknown type $e->{type});
 	}
 
-	print {$h} q(item ),($t?"--menu $t ":''),$e->{tag},qq(	$e->{title}\n);
+	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title}\n);
 };
 $i{ipxe2}{basic}=sub{
 	my $h=shift; #handle
@@ -172,18 +226,17 @@ $i{ipxe2}{basic}=sub{
 	my $t=shift;
 	my $o=shift;
 
-	if($i{ipxe2}{$e->{type}}){
-		return $i{ipxe2}{$e->{type}}($h,$e,$t,$o)
+	if('kfreebsd'eq$e->{type}){
+		return;
 	}elsif('linux16'eq$e->{type}){
 	}elsif('linux'eq$e->{type}){
 	}elsif('multiboot'eq$e->{type}){
 	}elsif('ipxelong'eq$e->{type}){
-	}elsif('kfreebsd'eq$e->{type}){
-		return;
 	}else{
 		warn qq(unknown type $e->{type});
 	}
 
+	warn unless defined $e->{kernel};
 	print {$h} q(:),$e->{tag};
 	print {$h} qq(\necho	'Loading kernel ...'\n);
 	print {$h} qq(kernel	$e->{kernel});
@@ -195,12 +248,15 @@ $i{ipxe2}{basic}=sub{
 };
 sub entry($\*$;$$){
 	my $t=shift; #target
-	#my $h=shift; #handle
-	#my $e=shift; #entry
-	#my $t=shift;
-	#my $o=shift;
+	my ($h,$e)=@_;
 
-	return $i{$t}{basic}(@_);
+	if($i{$t}{$e->{type}}){
+		return $i{$t}{$e->{type}}(@_)
+	}elsif($i{$t}{basic}){
+		return $i{$t}{basic}(@_);
+	}else{
+		die "unknown type $t";
+	}
 }
 sub out($\*){
 	my $t=shift; #target
@@ -218,7 +274,7 @@ my $count;
 $i{pxelinux}{out}=sub (\*){
 	my $h=shift;
 
-	do_menu(pxelinux=>menu=>*h,menu=>0);
+	do_menu(pxelinux=>menu=>*$h,menu=>0);
 };
 $i{grub}{out}=sub (\*){
 	my $h=shift;
@@ -267,7 +323,7 @@ while (<>){
 	next if /^[ 	]*[#;]/;
 	next if m!^[ 	]*//!;
 	next if m!^[ 	]*$!;
-	if(/^\[([0-9a-zA-Z]+)\]/){
+	if(/^\[([0-9a-zA-Z-]+)\]/){
 		$count++;
 		$order[$count]{tag}=$1;
 	}elsif($count){

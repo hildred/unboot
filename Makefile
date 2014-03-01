@@ -1,5 +1,5 @@
 
-all: grub.cfg menu.ipxe grubtemp # default.cfg
+all: grub.cfg menu.ipxe grubtemp default.cfg
 .PHONY:
 .SECONDARY:
 
@@ -20,6 +20,7 @@ diff: all
 	diff -q menu.ipxe boot|| vimdiff menu.ipxe boot
 	diff -q grub.cfg ../tftpboot/grub2/grub.cfg||vimdiff grub.cfg ../tftpboot/grub2/grub.cfg
 	diff -q grubtemp /boot/grub/grub.cfg ||EDITOR='vimdiff grubtemp' sudoedit /boot/grub/grub.cfg
+	diff -q default.cfg menu.cfg ||vimdiff default.cfg menu.cfg
 
 diffx: diff
 	diff -q grub.cfg grubtemp||vimdiff grub.cfg grubtemp
