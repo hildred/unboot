@@ -1,8 +1,69 @@
+
+[live]
+	title	= Live
+	type	= submenu
+[dlive]
+	title	= Live
+	type	= linux
+	kernel	= /tftpboot/debian-live/${arch}/vmlinuz-2.6.32-5-686
+	command	= boot=live config locale=en_US.UTF-8 keyb=us hooks=medium netboot=nfs nfsroot=${pxe_default_server}:/srv/debian-live/img quiet swapon
+	initrd	= /tftpboot/debian-live/${arch}/initrd.img-2.6.32-5-686
+	under	= live
+[persistant]
+	title	= Persistant
+	type	= linux
+	kernel	= /tftpboot/debian-live/${arch}/vmlinuz-2.6.32-5-686
+	command	= boot=live config locale=en_US.UTF-8 keyb=us hooks=medium persistant nfscow=${pxe_default_server}:/srv/debian-live/cow/client_mac_address netboot=nfs nfsroot=${pxe_default_server}:/srv/debian-live/img quiet swapon
+	initrd	= /tftpboot/debian-live/${arch}/initrd.img-2.6.32-5-686
+	under	= live
+[ltsp]
+	title	= LTSP
+	type	= linux
+	kernel	= /tftpboot/lts/2.6.17.8-ltsp-1/bzImage-2.6.17.8-ltsp-1 root=/dev/ram0 rw
+	initrd	= /tftpboot/lts/2.6.17.8-ltsp-1/initramfs.gz
+	under	= live
+[games]
+	title	= Games
+	type	= submenu
+[keen]
+	title	= keen
+	type	= memdisk
+	initrd	= /tftpboot/keen.img
+	under	= games
+[invaders]
+	title	= GRUB Invaders
+	type	= multiboot
+	kernel	= /tftpboot/invaders.exec
+	under	= games
+[installers]
+	title	= Installers
+	type	= submenu
 [debian]
 	title	= Debian
 	type	= submenu
-[fast]
+	under	= installers
+[grub]
+	title	= Chain grub
+	type	= ipxelong
+	kernel	= tftp://192.168.219.201/grub/grub.pxe
+	#-${arch}
 	under	= debian
+[pxelinux]
+	title	= Chain PXELINUX
+	type	= ipxelong
+	kernel	= /tftpboot/pxelinux-${arch}.0
+	under	= debian
+[grub2pxe]
+	title	= Chain grub2pxe
+	type	= ipxelong
+	kernel	= /tftpboot/grub2pxe-${arch}
+	under	= debian
+[linux]
+	title	= Linux
+	type	= submenu
+	under	= debian
+[fast]
+	under	= linux
 	title	= Install Debian (Fast)
 	class	= install,debian,gnu-linux,gnu,os
 	type	= linux16
@@ -10,13 +71,64 @@
 	command	= DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
 	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
 [expert]
-	under	= debian
+	under	= linux
 	title	= Install Debian (Expert)
 	class	= install,debian,gnu-linux,gnu,os
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= priority=low DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
 	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
+[kfreebsd]
+	title	= kFreeBSD
+	type	= submenu
+	under	= debian
+#[chkfreebsd]
+#	title	= kfreebsd install
+#	type	= ipxelong
+#	kernel	= /tftpboot/grub2pxe-${arch}
+#	under	= kfreebsd
+[kfreebsdn]
+	under	= kfreebsd
+	title	= Default kfreebsd install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
+[kfreebsda]
+	under	= kfreebsd
+	title	= Automated kfreebsd install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
+[kfreebsde]
+	under	= kfreebsd
+	title	= Expert kfreebsd install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.priority=low kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
+[kfreebsd9]
+	under	= kfreebsd
+	title	= Default kfreebsd-9 install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
+[kfreebsda9]
+	under	= kfreebsd
+	title	= Automated kfreebsd-9 install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
+[kfreebsde9]
+	under	= kfreebsd
+	title	= Expert kfreebsd-9 install
+	type	= kfreebsd
+	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
+	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
+	command	= kFreeBSD.desktop=xfce kFreeBSD.priority=low kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [utilities]
 	title	= Utilities
 	type	= submenu
@@ -69,7 +181,41 @@
 	type	= multiboot
 	kernel	= /tftpboot/memtest86+_multiboot.bin
 	command	= console=ttyS0,115200n8
+[exit]
+	title	= Exit
+	type	= submenu
+[exitx]
+	under	= exit
+	title	= Next boot device
+	type	= exit
+	exit	= exit
 [reboot]
+	under	= exit
 	title	= reboot
 	type	= exit
 	exit	= reboot
+[other]
+	title	= Other
+	type	= submenu
+[winpe]
+	under	= other
+	title	= Boot WinPE
+	type	= ipxelong
+	kernel	= /tftpboot/wimboot
+	xinitrd	= /tftpboot/winpe/${arch}/ISO/bootmgr	bootmgr:../tftpboot/winpe/${arch}/ISO/boot/bcd	BCD:../tftpboot/winpe/${arch}/ISO/boot/boot.sdi boot.sdi:../tftpboot/winpe/${arch}/winpe.wim	boot.wim
+[freedos]
+	under	= other
+	title	= freedos
+	type	= memdisk
+	initrd	= /tftpboot/fdboot.img
+[dos2]
+	under	= other
+	title	= dos2
+	type	= memdisk
+	initrd	= /tftpboot/fdnwd288.img
+[netdos]
+	under	= other
+	title	= netdos
+	type	= memdisk
+	initrd	= /tftpboot/netdos.img
+	command	= keeppxe

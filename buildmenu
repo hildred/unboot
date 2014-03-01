@@ -60,6 +60,28 @@ my %i=(
 		}
 	},
 	pxelinux=>{
+		memdisk=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			
+			warn unless defined $e->{initrd};
+			print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
+			print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
+			print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
+			unless(defined $e->{hotkey}){
+			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/){
+			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/){
+			}elsif($e->{title}=~s/($e->{hotkey})/^$1/){
+			}
+			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
+			print {$h} ('	'x$o),q(	kernel /memdisk),qq(\n);
+			print {$h} ('	'x$o),q(	initrd ),$e->{initrd},qq(\n) if defined $e->{initrd};
+			print {$h} ('	'x$o),q(	append ),$e->{command},qq(\n) if defined $e->{command};
+		},
 		submenu=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry

@@ -1,0 +1,20 @@
+#!/usr/bin/perl -p
+use warnings;
+use strict;
+
+my %v;
+BEGIN{
+foreach(@ARGV){
+	next unless /=/;
+	/^([^=]+)=(.+)/;
+	$v{$1}=$2;
+	$_=undef;
+}
+@ARGV=grep {defined} @ARGV;
+}
+sub subst($){
+	my $v=shift;
+	return $v{$v} if(defined $v{$v});
+	die "unknown key $v\n";
+}
+s!\${([a-zA-Z]+)}!subst($1)!ge;

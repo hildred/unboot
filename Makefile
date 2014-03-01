@@ -1,5 +1,5 @@
 
-all: grub.cfg menu.ipxe grubtemp default.cfg
+all: grub.cfg menu.ipxe grubtemp default.i386.cfg default.amd64.cfg
 .PHONY:
 .SECONDARY:
 
@@ -15,6 +15,12 @@ default.cfg: buildmenu menufile pxelinux.lib
 
 grubtemp: /etc/grub.d/*
 	sudo grub-mkconfig > $@
+
+default.i386.cfg: default.cfg
+	./expandvars arch=i386 $< > $@
+	
+default.amd64.cfg: default.cfg
+	./expandvars arch=amd64 $< > $@
 
 diff: all
 	diff -q menu.ipxe boot|| vimdiff menu.ipxe boot
