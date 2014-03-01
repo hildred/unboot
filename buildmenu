@@ -75,11 +75,32 @@ my %i=(
 			}
 			print {$h} ('	'x$o),q(	menu title ),$e->{lable},qq(\n) if defined $e->{lable};;
 			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};;
+			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 			print {$h} ('	'x$o),q(	label back),$e->{tag},qq(\n);
 			print {$h} ('	'x$o),q(		menu label ^Back..),qq(\n);
+			print {$h} ('	'x$o),qq(		text help\n),('	'x($o+3)),$e->{backhelp},qq(\n),('	'x$o),qq(\t\tendtext\n) if defined $e->{backhelp};;
 			print {$h} ('	'x$o),q(		menu exit),qq(\n);
 			do_menu(pxelinux=>$e->{tag},*$h,$t,$o+1);
 			print {$h} ('	'x$o),qq(menu end\n);
+		},
+		subfile=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+			
+			warn unless defined $e->{file};
+			print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
+			print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
+			print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
+			unless(defined $e->{hotkey}){
+			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/){
+			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/){
+			}elsif($e->{title}=~s/($e->{hotkey})/^$1/){
+			}
+			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
+			print {$h} ('	'x$o),q(	config ),$e->{file},qq(\n);
 		}
 	},
 	ipxe2=>{
@@ -142,7 +163,6 @@ $i{pxelinux}{basic}=sub{
 	my $t=shift;
 	my $o=shift;
 
-	my $t2;
 	if('linux16'eq$e->{type}){
 	}elsif('linux'eq$e->{type}){
 	}elsif('multiboot'eq$e->{type}){
@@ -154,16 +174,18 @@ $i{pxelinux}{basic}=sub{
 		warn qq(unknown type $e->{type});
 	}
 
+	#todo subfile ###
 	warn unless defined $e->{kernel};
 	print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
 	print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+	print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 	print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
 	unless(defined $e->{hotkey}){
 	}elsif($e->{title}=~s/^($e->{hotkey})/^$1/){
 	}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/){
 	}elsif($e->{title}=~s/($e->{hotkey})/^$1/){
 	}
-	print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n);
+	print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
 	print {$h} ('	'x$o),q(	kernel ),$e->{kernel},qq(\n);
 	print {$h} ('	'x$o),q(	initrd ),$e->{initrd},qq(\n) if defined $e->{initrd};
 	print {$h} ('	'x$o),q(	append ),$e->{command},qq(\n) if defined $e->{command};
@@ -175,6 +197,7 @@ $i{grub}{basic}=sub{
 	my $o=shift;
 
 	#todo hotkey, default ###
+	#todo subfile ###
 	my $t2;
 	if('linux16'eq$e->{type}){
 		$t2='initrd16';
@@ -300,6 +323,7 @@ sub do_menu($$\*;$$){
 			next;
 		}
 		next unless $e->{under}eq$m;
+		next if(defined $e->{only}); # meaning inverted by parser
 		entry($g,*$h,$e,$t,$o);
 	}
 }
@@ -315,6 +339,7 @@ $i{ipxe}{out}=sub (\*){
 			warn 'undefined type for entry';
 			next;
 		}
+		next if(defined $e->{only}); # meaning inverted by parser
 		entry('ipxe2',*$h,$e,menu=>0);
 	}
 };
@@ -329,7 +354,11 @@ while (<>){
 	}elsif($count){
 		s!^[ 	]*!!;
 		s![ 	]*$!!;
-		if(/^([0-9a-zA-Z]+)[ 	]*=[ 	]*(.*)$/){
+		if(/^(only)[ 	]*=[ 	]*(.*)$/i){
+			my @a = grep {$_ eq$mode} split /,/, $2;
+			next if scalar @a;
+			$order[$count]{lc($1)}++;
+		}elsif(/^([0-9a-zA-Z]+)[ 	]*=[ 	]*(.*)$/){
 			$order[$count]{lc($1)}=$2;
 		}else{
 			warn $_;
