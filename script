@@ -3,9 +3,6 @@
 
 exit
 
-grub-mkimage -O i386-pc-pxe -o grub.pxe -p '(pxe)/tftpboot/grub' pxecmd pxe bufio normal boot gfxterm video video_fb pci png echo
-grub-mkimage -O i386-efi -o grub32.efi -p '(pxe)/tftpboot/grub32efi'
-grub-mkimage -O x86_64-efi -o grub64.efi -p '(pxe)/tftpboot/grub64efi'
 
 cp -t /tftpboot/grub/ grub.pxe
 
@@ -36,7 +33,7 @@ exit
 ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg | grep txt | sed -e 's!^\(.*\)\(txt\)\(.*\)$!mv -i \1\2\3 \1gtk\3!e' -e '/^$/d'
 exit
 
-cc=nl
+cc=us
 release=wheezy
 version=current
 quiet='--no-check-certificate -nv'

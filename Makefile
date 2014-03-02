@@ -1,8 +1,16 @@
 
-all: grub.cfg menu.ipxe grubtemp default.i386.cfg default.amd64.cfg
+all: grub.cfg menu.ipxe grubtemp default.i386.cfg default.amd64.cfg # grub.pxe grub32.efi grub64.efi
 .PHONY:
 .SECONDARY:
 
+grub.pxe:
+	grub-mkimage -O i386-pc-pxe -o grub.pxe -p '(pxe)/tftpboot/grub' pxecmd pxe bufio normal boot gfxterm video video_fb pci png echo
+
+grub32.efi:
+	grub-mkimage -O i386-efi -o grub32.efi -p '(pxe)/tftpboot/grub32efi'
+
+grub64.efi:
+	grub-mkimage -O x86_64-efi -o grub64.efi -p '(pxe)/tftpboot/grub64efi'
 
 grub.cfg: buildmenu menufile grub.lib
 	./buildmenu grub menufile > $@
@@ -17,11 +25,14 @@ grubtemp: /etc/grub.d/*
 	sudo grub-mkconfig > $@
 
 default.i386.cfg: default.cfg
-	./expandvars arch=i386 $< > $@
+	./expandvars arch=i386 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug=' ' $< > $@
 	
 default.amd64.cfg: default.cfg
-	./expandvars arch=amd64 $< > $@
+	./expandvars arch=amd64 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug=' ' $< > $@
 
+#diff: all
+#	diff -q menu.ipxe boot.hold|| vimdiff menu.ipxe boot.hold
+#	diff -q default.cfg menu.cfg ||vimdiff default.cfg menu.cfg
 diff: all
 	diff -q menu.ipxe boot|| vimdiff menu.ipxe boot
 	diff -q grub.cfg ../tftpboot/grub2/grub.cfg||vimdiff grub.cfg ../tftpboot/grub2/grub.cfg
