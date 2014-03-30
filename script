@@ -34,10 +34,23 @@ ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg
 exit
 
 cc=us
-release=wheezy
+#release=wheezy
+release=testing
 version=current
 quiet='--no-check-certificate -nv'
 echo "
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
+
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-9/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/gtk/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
+http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
+
 http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
 http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
 http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
