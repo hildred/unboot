@@ -1,0 +1,11 @@
+{
+  "name": "unboot",
+  "version": "0.0.0",
+  "author": "Ben Hildred <ben@hildred.us>",
+  "description": "universial network boot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hildred/unboot.git"
+  },
+  "license": "gpl2+"
+}

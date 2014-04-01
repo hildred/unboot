@@ -68,8 +68,3 @@ if [ "${prev_saved_entry}" ]; then
 	set boot_once=true
 fi
 
-set default="0"
-
-load_video
-start_ser
-
