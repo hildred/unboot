@@ -1,2 +1,7 @@
 *.swp
 debian-installer/
+default.amd64.cfg
+default.cfg
+default.i386.cfg
+grub.cfg
+menu.ipxe
