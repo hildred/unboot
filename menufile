@@ -45,17 +45,20 @@
 [grub]
 	title	= Chain grub
 	type	= ipxelong
+	only	= ipxe
 	kernel	= tftp://192.168.219.201/grub/grub.pxe
 	#-${arch}
 	under	= debian
 [pxelinux]
 	title	= Chain PXELINUX
 	type	= ipxelong
+	only	= ipxe
 	kernel	= /tftpboot/pxelinux-${arch}.0
 	under	= debian
 [grub2pxe]
 	title	= Chain grub2pxe
 	type	= ipxelong
+	only	= ipxe
 	kernel	= /tftpboot/grub2pxe-${arch}
 	under	= debian
 [linux]
@@ -65,7 +68,6 @@
 [fast]
 	under	= linux
 	title	= Install Debian (Fast)
-	class	= install,debian,gnu-linux,gnu,os
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
@@ -73,7 +75,6 @@
 [expert]
 	under	= linux
 	title	= Install Debian (Expert)
-	class	= install,debian,gnu-linux,gnu,os
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= priority=low DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
@@ -85,12 +86,14 @@
 #[chkfreebsd]
 #	title	= kfreebsd install
 #	type	= ipxelong
+#	only	= ipxe
 #	kernel	= /tftpboot/grub2pxe-${arch}
 #	under	= kfreebsd
 [kfreebsdn]
 	under	= kfreebsd
 	title	= Default kfreebsd install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -98,6 +101,7 @@
 	under	= kfreebsd
 	title	= Automated kfreebsd install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -105,6 +109,7 @@
 	under	= kfreebsd
 	title	= Expert kfreebsd install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.priority=low kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -112,6 +117,7 @@
 	under	= kfreebsd
 	title	= Default kfreebsd-9 install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -119,6 +125,7 @@
 	under	= kfreebsd
 	title	= Automated kfreebsd-9 install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -126,6 +133,7 @@
 	under	= kfreebsd
 	title	= Expert kfreebsd-9 install
 	type	= kfreebsd
+	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
 	initrd	= /tftpboot/debian-installer/kfreebsd-${arch}/initrd-9.gz
 	command	= kFreeBSD.desktop=xfce kFreeBSD.priority=low kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
@@ -134,17 +142,18 @@
 	type	= submenu
 [shell]
 	title	= Enter iPXE shell
+	only	= ipxe
 	type	= exit
 	exit	= shell
 	under	= utilities
 [config]
 	title	= Config
+	only	= ipxe
 	type	= exit
 	exit	= config
 	under	= utilities
 [gparted]
 	title	= gparted
-	class	= live,debian,gnu-linux,gnu,os
 	type	= linux16
 	kernel	= /tftpboot/gparted/vmlinuz
 	command	= boot=live username=user config quiet noswap noeject nosplash fetch=http://${pxe_default_server}/gparted/filesystem.squashfs
@@ -184,6 +193,7 @@
 [exit]
 	title	= Exit
 	type	= submenu
+	only	= ipxe,grub
 [exitx]
 	under	= exit
 	title	= Next boot device
@@ -201,6 +211,7 @@
 	under	= other
 	title	= Boot WinPE
 	type	= ipxelong
+	only	= ipxe
 	kernel	= /tftpboot/wimboot
 	xinitrd	= /tftpboot/winpe/${arch}/ISO/bootmgr	bootmgr:../tftpboot/winpe/${arch}/ISO/boot/bcd	BCD:../tftpboot/winpe/${arch}/ISO/boot/boot.sdi boot.sdi:../tftpboot/winpe/${arch}/winpe.wim	boot.wim
 [freedos]
