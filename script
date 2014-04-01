@@ -1,76 +1,78 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
+function grub {
+	cp -t /tftpboot/grub/ grub.pxe
+	
+	# Copy gettext files
+	grubdir=/tftpboot/grub
+	localedir=/usr/share/locale
+	mkdir -p "${grubdir}"/locale/
+	for dir in "${localedir}"/*; do
+	    	if test -f "$dir/LC_MESSAGES/grub.mo"; then
+			cp -f "$dir/LC_MESSAGES/grub.mo" "${grubdir}/locale/${dir##*/}.mo"
+	    	fi
+	done
+	
+	# i386-coreboot
+	# i386-multiboot
+	# i386-pc
+	# i386-qemu
+	# mipsel-yeeloong-flash
+	# mipsel-yeeloong-elf
+	# i386-ieee1275
+	# powerpc-ieee1275
+	# sparc64-ieee1275-raw
+	# sparc64-ieee1275-aout
+}
 
-exit
-
-
-cp -t /tftpboot/grub/ grub.pxe
-
-# Copy gettext files
-grubdir=/tftpboot/grub
-localedir=/usr/share/locale
-mkdir -p "${grubdir}"/locale/
-for dir in "${localedir}"/*; do
-    if test -f "$dir/LC_MESSAGES/grub.mo"; then
-        cp -f "$dir/LC_MESSAGES/grub.mo" "${grubdir}/locale/${dir##*/}.mo"
-    fi
-done
-
-exit
-
-# i386-coreboot
-# i386-multiboot
-# i386-pc
-# i386-qemu
-# mipsel-yeeloong-flash
-# mipsel-yeeloong-elf
-# i386-ieee1275
-# powerpc-ieee1275
-# sparc64-ieee1275-raw
-# sparc64-ieee1275-aout
-
-exit
-ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg | grep txt | sed -e 's!^\(.*\)\(txt\)\(.*\)$!mv -i \1\2\3 \1gtk\3!e' -e '/^$/d'
-exit
+function bs_test {
+	ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg | grep txt | sed -e 's!^\(.*\)\(txt\)\(.*\)$!mv -i \1\2\3 \1gtk\3!e' -e '/^$/d'
+}
 
 cc=us
 #release=wheezy
 release=testing
 version=current
-quiet='--no-check-certificate -nv'
-echo "
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
+quiet='--no-check-certificate'
+#quiet='--no-check-certificate -nv'
+function download {
+	echo "
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
+	
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-9/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/gtk/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
+	"|wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer -i -
+	return
+	echo "
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinux
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot.conf
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
+	
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinux
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot.conf
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
+	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
+	"|wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer -i -
+}
+download
 
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-9/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/gtk/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
-
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinux
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot.conf
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
-
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinux
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot.conf
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
-http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
-"|
-wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer -i -
