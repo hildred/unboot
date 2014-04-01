@@ -39,10 +39,10 @@ grubtemp: /etc/grub.d/*
 	sudo grub-mkconfig > $@
 
 default.i386.cfg: default.cfg Makefile expandvars
-	./expandvars arch=i386 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug=' ' dpreseed=' ' dmode='-- quiet' $< > $@
+	./expandvars arch=i386 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug= dpreseed= dmode='-- quiet' $< > $@
 	
 default.amd64.cfg: default.cfg Makefile expandvars
-	./expandvars arch=amd64 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug=' ' dpreseed=' ' dmode='-- quiet' $< > $@
+	./expandvars arch=amd64 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug= dpreseed= dmode='-- quiet' $< > $@
 
 #diff: all
 #	diff -q menu.ipxe boot.hold|| vimdiff menu.ipxe boot.hold

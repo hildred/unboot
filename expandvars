@@ -6,7 +6,7 @@ my %v;
 BEGIN{
 foreach(@ARGV){
 	next unless /=/;
-	/^([^=]+)=(.+)/;
+	/^([^=]+)=(.*)$/;
 	$v{$1}=$2;
 	$_=undef;
 }
