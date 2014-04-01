@@ -1,5 +1,5 @@
 
-all: grub.cfg menu.ipxe grubtemp default.i386.cfg default.amd64.cfg # grub.pxe grub32.efi grub64.efi
+all: grub.cfg menu.ipxe default.i386.cfg default.amd64.cfg # grubtemp grub.pxe grub32.efi grub64.efi
 .PHONY:
 .SECONDARY:
 
