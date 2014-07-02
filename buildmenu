@@ -339,8 +339,8 @@ my %i=(
 			my $o=shift;
 
 			$e->{label}=$e->{title} unless defined $e->{label};
-			print {$h} q(:),$e->{tag};
-			print {$h} qq(\nmenu --name $e->{tag} $e->{label}\n);
+			print {$h} q(:),$e->{tag},qq(\n);
+			print {$h} qq(menu --name $e->{tag} $e->{label}\n);
 			do_menu(ipxe1=>$e->{tag},*$h,$e->{tag},$o+1);
 			print {$h} qq(item --menu $e->{tag} --gap\n);
 			print {$h} qq(item --menu $e->{tag} $e->{under}	Back to Parrent menu\n);
@@ -371,6 +371,23 @@ my %i=(
 			print {$h} qq(choose --menu $e->{tag} $e->{var} || $e->{cancel}\n);
 			print {$h} join "\n", split(';', $e->{extended}), '' if defined $e->{extended};
 			print {$h} qq(goto $e->{under}\n\n);
+		},
+		'submenu-var-ex'=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			$e->{label}=$e->{title} unless defined $e->{label};
+			print {$h} q(:),$e->{tag};
+			print {$h} qq(\nmenu --name $e->{tag} $e->{label}\n);
+			do_menu(ipxe1=>$e->{tag},*$h,$e->{tag},$o+1);
+			print {$h} qq(choose --menu $e->{tag} $e->{var} || $e->{cancel}\n);
+			print {$h} join "\n", split(';', $e->{extended}), '' if defined $e->{extended};
+			print {$h} qq(isset \${$e->{var}} && goto $e->{tag}-\${$e->{var}} ||\n);
+			print {$h} qq(goto $e->{under}\n);
+			do_menu(ipxe3=>$e->{tag},*$h,$e->{tag},$e->{under});
+			print {$h} qq(\n);
 		},
 		'submenu-edit'=>sub{
 			my $h=shift; #handle
@@ -417,6 +434,8 @@ my %i=(
 			print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{tag}\n\n);
 		},
+	},
+	ipxe3=>{
 	},
 );
 $i{pxelinux}{basic}=sub{
@@ -501,6 +520,7 @@ $i{ipxe1}{basic}=sub{
 	}elsif('ipxelong'eq$e->{type}){
 	}elsif('read-var'eq$e->{type}){
 	}elsif('submenu-var'eq$e->{type}){
+	}elsif('submenu-var-ex'eq$e->{type}){
 	}elsif('submenu-edit'eq$e->{type}){
 	}elsif('sanboot'eq$e->{type}){
 	}elsif('sanhook'eq$e->{type}){
@@ -543,6 +563,21 @@ $i{ipxe2}{basic}=sub{
 	print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
 	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+};
+$i{ipxe3}{basic}=sub{
+	my $h=shift; #handle
+	my $e=shift; #entry
+	my $t=shift;
+	my $o=shift;
+
+	if('value'eq$e->{type}){
+	}else{
+		warn qq(unknown type $e->{type});
+	}
+
+	print {$h} q(:),$e->{under},'-',$e->{tag},qq(\n);
+	print {$h} join "\n", split(';', $e->{extended}), '' if defined $e->{extended};
+	print {$h} qq(goto $o\n);
 };
 sub entry($\*$;$$){
 	my $t=shift; #target
