@@ -17,13 +17,13 @@ grub64.efi:
 
 %.set: %.grub %.ipxe %.slcfg
 
-%.grub: %.menu buildmenu
+%.grub: %.menu buildmenu grub.lib
 	./buildmenu grub $< > $@
 
-%.ipxe: %.menu buildmenu
+%.ipxe: %.menu buildmenu ipxe.lib
 	./buildmenu ipxe $< > $@
 
-%.slcfg: %.menu buildmenu
+%.slcfg: %.menu buildmenu pxelinux.lib
 	./buildmenu pxelinux $< > $@
 
 grub.cfg: buildmenu menufile grub.lib
@@ -45,14 +45,14 @@ default.amd64.cfg: default.cfg Makefile expandvars
 	./expandvars arch=amd64 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug= dpreseed= dmode='-- quiet' $< > $@
 
 #diff: all
-#	diff -q menu.ipxe boot.hold|| vimdiff menu.ipxe boot.hold
-#	diff -q default.cfg menu.cfg ||vimdiff default.cfg menu.cfg
+#	diff -q menu.ipxe boot.hold|| gvimdiff -f menu.ipxe boot.hold
+#	diff -q default.cfg menu.cfg ||gvimdiff -f default.cfg menu.cfg
 diff: all debhd.grub
-	diff -q menu.ipxe boot|| vimdiff menu.ipxe boot
-	diff -q grub.cfg ../tftpboot/grub2/grub.cfg||vimdiff grub.cfg ../tftpboot/grub2/grub.cfg
-	diff -q grubtemp /boot/grub/grub.cfg ||EDITOR='vimdiff grubtemp' sudoedit /boot/grub/grub.cfg
-	diff -q default.i386.cfg menu.cfg ||vimdiff default.i386.cfg menu.cfg
-	diff -q debhd.grub grubtemp||vimdiff debhd.grub grubtemp
+	diff -q menu.ipxe boot|| gvimdiff -f menu.ipxe boot
+	diff -q grub.cfg ../tftpboot/grub2/grub.cfg||gvimdiff -f grub.cfg ../tftpboot/grub2/grub.cfg
+	diff -q grubtemp /boot/grub/grub.cfg ||EDITOR='gvimdiff -f grubtemp' sudoedit /boot/grub/grub.cfg
+	diff -q default.i386.cfg menu.cfg ||gvimdiff -f default.i386.cfg menu.cfg
+	diff -q debhd.grub grubtemp||gvimdiff -f debhd.grub grubtemp
 
 diffx: diff
-	diff -q grub.cfg grubtemp||vimdiff grub.cfg grubtemp
+	diff -q grub.cfg grubtemp||gvimdiff -f grub.cfg grubtemp

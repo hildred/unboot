@@ -1,6 +1,10 @@
 #!/bin/bash -x
 
 function grub {
+	local grubdir
+	local localedir
+	local dir
+
 	cp -t /tftpboot/grub/ grub.pxe
 	
 	# Copy gettext files
@@ -29,13 +33,20 @@ function bs_test {
 	ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg | grep txt | sed -e 's!^\(.*\)\(txt\)\(.*\)$!mv -i \1\2\3 \1gtk\3!e' -e '/^$/d'
 }
 
-cc=us
-#release=wheezy
-release=testing
-version=current
-quiet='--no-check-certificate'
-#quiet='--no-check-certificate -nv'
 function download {
+	local release
+	local version
+	local cc
+	local quiet
+
+	quiet='--no-check-certificate'
+	#quiet='--no-check-certificate -nv'
+
+	cc="$1";shift
+	release="$1";shift
+	version="$1";shift
+
+	false && \
 	echo "
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
@@ -48,8 +59,9 @@ function download {
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/gtk/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
-	"|wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer -i -
-	return
+	"|wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i -
+
+	false && \
 	echo "
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
@@ -72,7 +84,13 @@ function download {
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
-	"|wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer -i -
+	"|wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer/"${release}" -i -
 }
-download
+
+cc=us
+#release=wheezy
+release=testing
+#release=stable
+version=current
+download "${cc}" "${release}" "${version}"
 
