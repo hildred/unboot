@@ -1,3 +1,2 @@
 language: perl
 perl: "5.16"
-install: true
