@@ -1,2 +1,3 @@
 language: perl
 perl: "5.16"
+intall: sudo apt-get install libintl-perl
