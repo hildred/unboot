@@ -5,3 +5,4 @@ default.cfg
 default.i386.cfg
 grub.cfg
 menu.ipxe
+grubtemp

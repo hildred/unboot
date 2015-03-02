@@ -1,5 +1,6 @@
 
-all: grub.cfg menu.ipxe default.i386.cfg default.amd64.cfg grubtemp unboot.pot #grub
+all: grub.cfg menu.ipxe default.i386.cfg default.amd64.cfg unboot.pot
+extra: grubtemp grub
 .PHONY:
 .SECONDARY:
 LOCALIZABLE=./buildmenu
