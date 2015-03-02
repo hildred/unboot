@@ -6,7 +6,7 @@ function grub {
 	local dir
 
 	cp -t /tftpboot/grub/ grub.pxe
-	
+
 	# Copy gettext files
 	grubdir=/tftpboot/grub
 	localedir=/usr/share/locale
@@ -16,7 +16,7 @@ function grub {
 			cp -f "$dir/LC_MESSAGES/grub.mo" "${grubdir}/locale/${dir##*/}.mo"
 	    	fi
 	done
-	
+
 	# i386-coreboot
 	# i386-multiboot
 	# i386-pc
@@ -52,7 +52,7 @@ function download {
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
-	
+
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-9/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-9/netboot.tar.gz
@@ -73,7 +73,7 @@ function download {
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
-	
+
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
 	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso

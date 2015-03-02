@@ -1,19 +1,14 @@
 
-all: grub.cfg menu.ipxe default.i386.cfg default.amd64.cfg # grubtemp grub.pxe grub32.efi grub64.efi
+all: grub.cfg menu.ipxe default.i386.cfg default.amd64.cfg grubtemp unboot.pot #grub
 .PHONY:
 .SECONDARY:
+LOCALIZABLE=./buildmenu
 
 test: all
 	true
 
-grub.pxe:
-	grub-mkimage -O i386-pc-pxe -o grub.pxe -p '(pxe)/tftpboot/grub' pxecmd pxe bufio normal boot gfxterm video video_fb pci png echo multiboot bsd echo cpuid gzio minicmd vbe
-
-grub32.efi:
-	grub-mkimage -O i386-efi -o grub32.efi -p '(pxe)/tftpboot/grub32efi'
-
-grub64.efi:
-	grub-mkimage -O x86_64-efi -o grub64.efi -p '(pxe)/tftpboot/grub64efi'
+grub:
+	grub-mknetdir --compress=xz --net-directory=/tftpboot --subdir=grub --modules="bufio normal boot gfxterm video video_fb png echo multiboot bsd echo cpuid gzio minicmd test"
 
 %.set: %.grub %.ipxe %.slcfg
 
@@ -26,6 +21,18 @@ grub64.efi:
 %.slcfg: %.menu buildmenu pxelinux.lib
 	./buildmenu pxelinux $< > $@
 
+unboot.pot: $(LOCALIZABLE)
+	xgettext -L Perl \
+	    -k__ -k\$__ -k%__ -k__n:1,2 -k__nx:1,2 -k__np:2,3 -k__npx:2,3 -k__p:2 \
+	    -k__px:2 -k__x -k__xn:1,2 -kN__ -kN__n -kN__np -kN__p -k \
+	    --from-code utf-8 -o $@ $(LOCALIZABLE)
+
+%.pot: %.menu buildmenu pot.lib
+	./buildmenu pot $< > $@
+
+menufile.pot: menufile buildmenu pot.lib
+	./buildmenu pot menufile > $@
+
 grub.cfg: buildmenu menufile grub.lib
 	./buildmenu grub menufile > $@
 
@@ -35,12 +42,12 @@ menu.ipxe: buildmenu menufile ipxe.lib
 default.cfg: buildmenu menufile pxelinux.lib
 	./buildmenu pxelinux menufile > $@
 
-grubtemp: /etc/grub.d/*
+grubtemp: /etc/grub.d/* /usr/sbin/grub-mkconfig
 	sudo grub-mkconfig > $@
 
 default.i386.cfg: default.cfg Makefile expandvars
 	./expandvars arch=i386 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug= dpreseed= dmode='-- quiet' $< > $@
-	
+
 default.amd64.cfg: default.cfg Makefile expandvars
 	./expandvars arch=amd64 pxe_default_server=192.168.0.1 video=gtk dvideo='dvideo video=vesa:ywrap,mtrr vga=788' ddesktop=xfce ddebug= dpreseed= dmode='-- quiet' $< > $@
 

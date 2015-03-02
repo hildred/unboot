@@ -12,7 +12,7 @@ set esc:hex 1b
 isset ${video} || set video gtk
 isset ${vid} || set vid ${video}
 isset ${debug} || set debug 5
-isset ${preseed} || set preseed http://${pxe_default_server}/debian/preseed.cfg 
+isset ${preseed} || set preseed http://${pxe_default_server}/debian/preseed.cfg
 isset ${desktop} || set desktop xfce
 isset ${dpreseed} || set dpreseed url=${preseed}
 isset ${ddesktop} || set ddesktop desktop=${desktop}

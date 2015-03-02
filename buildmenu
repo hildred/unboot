@@ -1,22 +1,184 @@
 #!/usr/bin/perl
 use warnings;
 use strict;
+use v5.8;
+use Locale::Messages qw(dgettext dpgettext);
+use Locale::TextDomain 'unboot';
 
 my @order=({(type=>'config')});
+my %lines=();
+my %menudomain=();
+my $target='net';
 
 sub do_menu($$\*;$$);
+sub entry($\*$;$$);
+sub out($\*);
+
+sub _f($@){
+	my $string=shift;
+	return '' unless grep {$_}@_;
+	return sprintf $string, @_;
+}
+sub ___($$){
+	my $e=shift; #entry
+	return Locale::Messages::dgettext($menudomain{$e->{file}},$_);
+}
+sub ___o($$){
+	my $e=shift; #entry
+	return Locale::Messages::dgettext($menudomain{$e->{file}},@{$e}{@_});
+}
+sub ___t($){
+	my $e=shift; #entry
+	return Locale::Messages::dgettext($menudomain{$e->{file}},$e->{title});
+}
+sub ___h($){
+	my $e=shift; #entry
+	return Locale::Messages::dpgettext($menudomain{$e->{file}},$e->{title},$e->{hotkey});
+}
+sub ___p($$$){
+	my $e=shift; #entry
+	my $ctxt=shift;
+	return Locale::Messages::dpgettext($menudomain{$e->{file}},$ctxt,@_);
+}
+sub xwarn($@){
+	my $e=shift; #entry
+	my @c=(caller,@{$e}{qw(file line)});
+	my $p=shift @c;
+	warn sprintf __("%s at %s line %d, %s line %d\n"), join(' ',@_), @c;
+}
+
 my %i=(
 	grub=>{
+		out=>sub(\*){
+			my $h=shift;
+
+			do_menu(grub=>menu=>*$h,menu=>0);
+			foreach my $e (@order){
+				next unless defined $e;
+			}
+		},
 		config=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
-			print {$h} ('	'x$o), 'set timeout='.$e->{timeout}."\n\n" if defined $e->{timeout};
-			print {$h} ('	'x$o), 'load_video'."\n";
-			print {$h} ('	'x$o), 'start_ser'."\n\n";
+			warn if $e ne $order[0];
+			$target=$e->{target} if defined $e->{target};
+			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			print {$h} << 'EOF';
+function load_video {
+	if [ x$feature_default_font_path = xy ] ; then
+		font=unicode
+	else
+		font=$prefix/unicode.pf2
+	fi
+	if loadfont $font ; then
+		set gfxmode=auto
+		if [ x$feature_all_video_module = xy ]; then
+			insmod all_video
+		else
+			insmod efi_gop
+			insmod efi_uga
+			insmod ieee1275_fb
+			insmod vbe
+			insmod vga
+			insmod video_bochs
+			insmod video_cirrus
+		fi
+		if insmod gfxterm; then
+			terminal_output --append gfxterm
+		fi
+		set locale_dir=$prefix/locale
+		if [ -n "${1}" ] ; then
+			set lang="${1}"
+		else
+EOF
+			print {$h} << "EOF" if(defined $e->{lang});
+			set lang=$e->{lang}
+EOF
+			print {$h} << 'EOF';
+		fi
+		insmod gettext
+		insmod png
+	fi
+
+	if insmod gfxmenu; then
+		loadfont $prefix/themes/starfield/dejavu_10.pf2
+		loadfont $prefix/themes/starfield/dejavu_12.pf2
+		loadfont $prefix/themes/starfield/dejavu_14.pf2
+		loadfont $prefix/themes/starfield/dejavu_16.pf2
+		loadfont $prefix/themes/starfield/dejavu_bold_14.pf2
+		set theme=$prefix/themes/starfield/theme.txt
+		export theme
+	elif background_image $prefix/joy-grub.png; then
+		set color_normal=white/black
+		set color_highlight=black/white
+	else
+		set menu_color_normal=cyan/blue
+		set menu_color_highlight=white/blue
+	fi
+}
+
+if cpuid -l ; then
+	set arch=amd64
+else
+	set arch=i386
+fi
+
+EOF
+			print {$h} << 'EOF' if 'disk'eq$target;
+if [ -s $prefix/grubenv ]; then
+	load_env
+	set have_grubenv=true
+fi
+
+if [ "${next_entry}" ] ; then
+	set default="${next_entry}"
+	set next_entry=
+	save_env next_entry
+	set boot_once=true
+EOF
+			print {$h} << "EOF" if defined $e->{default};
+else
+	set default="$e->{default}"
+EOF
+			print {$h} << 'EOF' if 'disk'eq$target;
+fi
+
+EOF
+			print {$h} << 'EOF';
+if [ x"${feature_menuentry_id}" = xy ]; then
+	menuentry_id_option="--id"
+else
+	menuentry_id_option=""
+fi
+
+export menuentry_id_option
+
+if [ "${prev_saved_entry}" ]; then
+	set saved_entry="${prev_saved_entry}"
+	save_env saved_entry
+	set prev_saved_entry=
+	save_env prev_saved_entry
+	set boot_once=true
+fi
+
+EOF
+			print {$h} << "EOF" if defined $e->{timeout};
+if [ "\${recordfail}" = 1 ] ; then
+	set timeout=-1
+else
+	if [ x\$feature_timeout_style = xy ] ; then
+		set timeout_style=menu
+	fi
+	set timeout=$e->{timeout}
+fi
+
+EOF
+			print {$h} ('	'x$o), "set prefix=\"/grub\"\n";
+			print {$h} ('	'x$o), "load_video \"$e->{lang}\"\n";
+			print {$h} ('	'x$o), "start_ser\n\n";
 		},
 		gap=>sub{
 			my $h=shift; #handle
@@ -24,21 +186,21 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o),q(menuenty '),$e->{title},q(');
+			print {$h} ('	'x$o),q(menuenty '),___t($e),q(');
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
 			print {$h} qq( {}\n);
 		},
-		gapvar=>sub{warn "unfinished code";},
-		'read-var'=>sub{warn "unfinished code";},
-		'submenu-var'=>sub{warn "unfinished code";},
-		'submenu-edit'=>sub{warn "unfinished code";},
+		gapvar		=>sub{warn __("unfinished code");},
+		'read-var'	=>sub{warn __("unfinished code");},
+		'submenu-var'	=>sub{warn __("unfinished code");},
+		'submenu-edit'	=>sub{warn __("unfinished code");},
 		exit=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(');
+			print {$h} ('	'x$o),q(menuentry '),___t($e),q(');
 			print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
 			print {$h} qq( {\n),('	'x$o),qq(	$e->{exit}\n),('	'x$o),qq(}\n);
@@ -49,14 +211,22 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(');
+			warn __('No kernel') unless defined $e->{kernel};
+			print {$h} ('	'x$o),q(menuentry '),___t($e),q(');
 			print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
-			print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading kernel ...'\n),('	'x$o);
-			print {$h} qq(	$e->{type}	$e->{kernel}\n);
-			print {$h} ('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	kfreebsd_module $e->{initrd} type=mfs_root\n) if defined $e->{initrd};
+			print {$h} qq( {\n),('	'x$o),q(	echo	');
+			my $ks=$e->{kernel};$ks=~s! .*$!!;$ks=~s!^.*/!!;
+			printf {$h} __(q(Loading kernel %s ...)),$ks;
+			print {$h} qq('\n),('	'x$o),qq(	$e->{type}	$e->{kernel}\n);;
+			if(defined $e->{initrd}){
+				print {$h} ('	'x$o),qq(	echo	');
+				my $is=$e->{initrd};$is=~s! .*$!!;$is=~s!^.*/!!;
+				printf {$h} __(q(Loading initial ramdisk %s ...)),$is;
+				print {$h} qq('\n),('	'x$o),qq(	kfreebsd_module $e->{initrd} type=mfs_root\n);
+			}
 			print {$h} map {('	'x$o),qq(	set $_\n)} split / /, $e->{command} if defined $e->{command};
-			print {$h} ('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
+			print {$h} ('	'x$o),qq(	echo	'$__{'Booting ...'}'\n),('	'x$o),qq(}\n);
 		},
 		memdisk=>sub{
 			my $h=shift; #handle
@@ -64,14 +234,21 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o),q(menuentry '),$e->{title},q(');
+			warn __('No initrd') unless defined $e->{initrd};
+			print {$h} ('	'x$o),q(menuentry '),___t($e),q(');
 			print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
-			print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading memdisk ...'\n),('	'x$o);
+			print {$h} qq( {\n),('	'x$o),qq(	echo	');
+			printf {$h} __(q(Loading kernel %s ...)),'memdisk';
+			print {$h} qq('\n),('	'x$o);
 			print {$h} qq(	linux16	/memdisk);
 			print {$h} qq( $e->{command}) if defined $e->{command};
-			print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	initrd16	$e->{initrd}) if defined $e->{initrd};
-			print {$h} qq(\n),('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
+			print {$h} qq(\n);
+			print {$h} ('	'x$o),qq(	echo	');
+			my $is=$e->{initrd};$is=~s! .*$!!;$is=~s!^.*/!!;
+			printf {$h} __(q(Loading initial ramdisk %s ...)),$is;
+			print {$h} qq('\n),('	'x$o),qq(	initrd16	$e->{initrd}\n);
+			print {$h} ('	'x$o),qq(	echo	'$__{'Booting ...'}'\n),('	'x$o),qq(}\n);
 		},
 		submenu=>sub{
 			my $h=shift; #handle
@@ -79,7 +256,7 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} ('	'x$o),q(submenu '),$e->{title},q(');
+			print {$h} ('	'x$o),q(submenu '),___t($e),q(');
 			print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
 			print {$h} qq( {\n);
@@ -88,16 +265,22 @@ my %i=(
 		}
 	},
 	pxelinux=>{
+		out=>sub (\*){
+			my $h=shift;
+
+			do_menu(pxelinux=>menu=>*$h,menu=>0);
+		},
 		config=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
-			warn print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
-			warn print {$h} ('	'x$o), 'set timeout='.$e->{timeout}."\n\n" if defined $e->{timeout};
+			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			warn __("default unimplemented") if defined $e->{default};
+			warn __("timeout unimplemented") if defined $e->{timeout};
+			;#print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
+			;#print {$h} ('	'x$o), 'set timeout=' .$e->{timeout}.  "\n\n" if defined $e->{timeout};
 		},
 		gap=>sub{
 			my $h=shift; #handle
@@ -105,37 +288,43 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			print {$h} ('	'x$o),q(menu seperator),qq(\n);
-			warn "unfinished code";
+			warn __("unfinished code");
 		},
-		gapvar=>sub{warn "unfinished code";},
-		'submenu-var'=>sub{warn "unfinished code";},
-		'submenu-edit'=>sub{warn "unfinished code";},
-		'read-var'=>sub{warn "unfinished code";},
+		gapvar=>sub{warn __("unfinished code");},
+		'submenu-var'=>sub{warn __("unfinished code");},
+		'submenu-edit'=>sub{warn __("unfinished code");},
+		'read-var'=>sub{warn __("unfinished code");},
 		kfreebsd=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
-			warn unless defined $e->{kernel};
+			warn __('class unimplemented') if defined $e->{class};
+			warn __('security unimplemented') if defined $e->{users};
+			warn __('No kernel') unless defined $e->{kernel};
 			print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
 			print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+################################################################################
 			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 			print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
-			unless(defined $e->{hotkey}){
-			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/i){
-			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/i){
-			}elsif($e->{title}=~s/($e->{hotkey})/^$1/i){
-			}else{
-				warn "unmarked hotkey on $e->{tag}: $e->{title}";
+			my $title=___t($e);
+			if(defined $e->{hotkey}){
+				my $hk=___h($e);
+				if($title=~s/^($hk)/^$1/i){
+				}elsif($title=~s/ ($hk)/ ^$1/i){
+				}elsif($title=~s/($hk)/^$1/i){
+				}elsif($hk!=$e->{hotkey}){
+					$title=~s/$/ (^$hk)/;
+				}else{
+					warn sprintf __('unmarked hotkey on %s: "%s", "%s"'),$e->{tag}, $hk, $title;
+				}
 			}
-			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
-			print {$h} ('	'x$o),q(	kernel /mboot.c32),qq(\n);
+			print {$h} ('	'x$o),qq(	menu label $title\n) if defined $e->{title};
+			print {$h} ('	'x$o),qq(	kernel /mboot.c32\n);
 			print {$h} ('	'x$o),q(	append ),$e->{kernel};
 			print {$h} q( ),$e->{command} if defined $e->{command};
 			print {$h} ' -- ',$e->{initrd} if defined $e->{initrd};
@@ -147,21 +336,27 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
-			warn unless defined $e->{initrd};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
+			warn __('No initrd') unless defined $e->{initrd};
 			print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
 			print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
-			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
+################################################################################
+			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),___o($e,'help'),qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 			print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
-			unless(defined $e->{hotkey}){
-			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/i){
-			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/i){
-			}elsif($e->{title}=~s/($e->{hotkey})/^$1/i){
-			}else{
-				warn "unmarked hotkey on $e->{tag}: $e->{title}";
+			my $title=___t($e);
+			if(defined $e->{hotkey}){
+				my $hk=___h($e);
+				if($title=~s/^($hk)/^$1/i){
+				}elsif($title=~s/ ($hk)/ ^$1/i){
+				}elsif($title=~s/($hk)/^$1/i){
+				}elsif($hk!=$e->{hotkey}){
+					$title=~s/$/ (^$hk)/;
+				}else{
+					warn sprintf __('unmarked hotkey on %s: "%s", "%s"'),$e->{tag}, $hk, $title;
+				}
 			}
-			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
+			print {$h} ('	'x$o),qq(	menu label $title\n) if defined $e->{title};
 			print {$h} ('	'x$o),q(	kernel /memdisk),qq(\n);
 			print {$h} ('	'x$o),q(	initrd ),$e->{initrd},qq(\n) if defined $e->{initrd};
 			print {$h} ('	'x$o),q(	append ),$e->{command},qq(\n) if defined $e->{command};
@@ -172,23 +367,30 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			print {$h} ('	'x$o),q(menu begin ),$e->{tag},qq(\n);
 			print {$h} ('	'x$o),q(	include debian-installer/boot-screens/stdmenu.cfg),qq(\n);
-			unless(defined $e->{hotkey}){
-			}elsif($e->{title}=~s/^($e->{hotkey})/^$1/i){
-			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/i){
-			}elsif($e->{title}=~s/($e->{hotkey})/^$1/i){
-			}else{
-				warn "unmarked hotkey on $e->{tag}: $e->{title}";
+			my $title=___t($e);
+			if(defined $e->{hotkey}){
+				my $hk=___h($e);
+				if($title=~s/^($hk)/^$1/i){
+				}elsif($title=~s/ ($hk)/ ^$1/i){
+				}elsif($title=~s/($hk)/^$1/i){
+				}elsif($hk!=$e->{hotkey}){
+					$title=~s/$/ (^$hk)/;
+				}else{
+					warn sprintf __('unmarked hotkey on %s: "%s", "%s"'),$e->{tag}, $hk, $title;
+				}
 			}
-			print {$h} ('	'x$o),q(	menu title ),$e->{lable},qq(\n) if defined $e->{lable};;
-			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};;
-			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
+			print {$h} ('	'x$o),q(	menu title ),___o($e,'lable'),qq(\n) if defined $e->{lable};;
+			print {$h} ('	'x$o),qq(	menu label $title\n) if defined $e->{title};
+################################################################################
+			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),___o($e,'help'),qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 			print {$h} ('	'x$o),q(	label back),$e->{tag},qq(\n);
 			print {$h} ('	'x$o),q(		menu label ^Back..),qq(\n);
-			print {$h} ('	'x$o),qq(		text help\n),('	'x($o+3)),$e->{backhelp},qq(\n),('	'x$o),qq(\t\tendtext\n) if defined $e->{backhelp};;
+################################################################################
+			print {$h} ('	'x$o),qq(		text help\n),('	'x($o+3)),___o($e,q{backhelp}),qq(\n),('	'x$o),qq(\t\tendtext\n) if defined $e->{backhelp};;
 			print {$h} ('	'x$o),q(		menu exit),qq(\n);
 			do_menu(pxelinux=>$e->{tag},*$h,$t,$o+1);
 			print {$h} ('	'x$o),qq(menu end\n);
@@ -198,12 +400,13 @@ my %i=(
 			my $e=shift; #entry
 			my $t=shift;
 			my $o=shift;
-			
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
-			warn unless defined $e->{file};
+
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
+			warn __('No file') unless defined $e->{file};
 			print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
 			print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
+################################################################################
 			print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
 			print {$h} ('	'x$o),q(	menu default),qq(\n) if defined $e->{default};
 			unless(defined $e->{hotkey}){
@@ -211,10 +414,27 @@ my %i=(
 			}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/i){
 			}elsif($e->{title}=~s/($e->{hotkey})/^$1/i){
 			}else{
-				warn "unmarked hotkey on $e->{tag}: $e->{title}";
+				warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 			}
 			print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
 			print {$h} ('	'x$o),q(	config ),$e->{file},qq(\n);
+		}
+	},
+	ipxe=>{
+		out=>sub (\*){
+			my $h=shift;
+			print {$h} qq(:menu\nmenu --name menu\n);
+			do_menu(ipxe1=>menu=>*$h,menu=>0);
+			print {$h} qq(choose --menu menu target || exit\nmenu --name menu --delete\ngoto \${target}\n\n);
+			foreach my $e (@order){
+				next unless defined $e;
+				unless(defined $e->{type}){
+					warn __('undefined type for entry');
+					next;
+				}
+				next if(defined $e->{only}); # meaning inverted by parser
+				entry('ipxe2',*$h,$e,menu=>0);
+			}
 		}
 	},
 	ipxe1=>{
@@ -224,8 +444,9 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
 			print {$h} ('	'x$o), 'set timeout='.$e->{timeout}."\n\n" if defined $e->{timeout};
 		},
@@ -235,8 +456,8 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			print {$h} q(item ),($t?"--menu $t ":''),"--gap",($e->{title}?" $e->{title}":''),qq(\n);
 		},
 		gapvar=>sub{
@@ -245,8 +466,8 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			print {$h} qq(isset \${$e->{var}} && );
 			print {$h} q(item ),($t?"--menu $t ":''),"--gap ",qq($e->{titlet} || );
 			print {$h} q(item ),($t?"--menu $t ":''),"--gap ",qq($e->{titlef}\n);
@@ -257,17 +478,20 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			warn "unimplemented" if defined $e->{class};
-			warn "unimplemented" if defined $e->{users};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
 			$e->{tag}=$e->{value} if defined $e->{value};
 			unless(defined $e->{hotkey}){
 			}elsif($e->{title}=~s/^($e->{hotkey})/($1)/i){
 			}elsif($e->{title}=~s/ ($e->{hotkey})/ ($1)/i){
 			}elsif($e->{title}=~s/($e->{hotkey})/($1)/i){
 			}else{
-				warn "unmarked hotkey on $e->{tag}: $e->{title}";
+				warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 			}
-			print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title}\n);
+			print {$h} 'item ',_f('--menu %s ',$t),
+				_f('--key %s ',$e->{hotkey}),
+				($e->{default}?"--default ":''),
+				qq($e->{tag}\t$e->{title}\n);
 		},
 	},
 	ipxe2=>{
@@ -281,8 +505,9 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} q(:),$e->{tag},"",qq(\nisset \${sanid} && inc sanid || set sanid:int8 0x80 \nsanboot --drive \${sanid:int8} $e->{path} || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
-			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+################################################################################
+			print {$h} qq(:$e->{tag}\nisset \${sanid} && inc sanid || set sanid:int8 0x80 \nsanboot --drive \${sanid:int8} $e->{path} || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+			print {$h} qq(:debug-$e->{tag}\nshell\ngoto $e->{under}\n\n);
 		},
 		sanhook=>sub{
 			my $h=shift; #handle
@@ -290,8 +515,9 @@ my %i=(
 			my $t=shift;
 			my $o=shift;
 
-			print {$h} q(:),$e->{tag},"",qq(\nisset \${sanid} && inc sanid || set sanid:int8 0x80 \nsanhook --drive \${sanid:int8} $e->{path} || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
-			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+################################################################################
+			print {$h} qq(:$e->{tag}\nisset \${sanid} && inc sanid || set sanid:int8 0x80 \nsanhook --drive \${sanid:int8} $e->{path} || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+			print {$h} qq(:debug-$e->{tag}\nshell\ngoto $e->{under}\n\n);
 		},
 		exit=>sub{
 			my $h=shift; #handle
@@ -300,7 +526,7 @@ my %i=(
 			my $o=shift;
 
 			print {$h} q(:),$e->{tag},"\n",$e->{exit},qq( || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
-			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+			print {$h} qq(:debug-$e->{tag}\nshell\ngoto $e->{under}\n\n);
 		},
 		memdisk=>sub{
 			my $h=shift; #handle
@@ -312,9 +538,10 @@ my %i=(
 			print {$h} qq(\necho	Loading kernel ...\n);
 			print {$h} qq(kernel	../tftpboot/memdisk);
 			print {$h} qq( $e->{command}) if defined $e->{command};
+################################################################################
 			print {$h} qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$e->{initrd}) if defined $e->{initrd};
 			print {$h} qq( || goto debug-$e->{tag}\nimgstat\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
-			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
+			print {$h} qq(:debug-$e->{tag}\nshell\ngoto $e->{under}\n\n);
 		},
 		kfreebsd=>sub{
 			my $h=shift; #handle
@@ -324,9 +551,10 @@ my %i=(
 
 			print {$h} q(:),$e->{tag};
 			print {$h} qq(\necho	Loading kernel ...\nimgstat\nshell\n);
-			warn "unfinished code";
+			warn __("unfinished code");
 				print {$h} qq(kernel	$e->{kernel});
 				print {$h} qq( $e->{command}) if defined $e->{command};
+################################################################################
 				print {$h} qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$e->{initrd}) if defined $e->{initrd};
 				print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
 				print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
@@ -400,10 +628,10 @@ my %i=(
 			}elsif('multiboot'eq$e->{subtype}){
 			#}elsif('ipxelong'eq$e->{subtype}){
 			}else{
-				warn qq(unknown subtype $e->{subtype});
+				warn sprintf __(qq(Unknown kernel type %s)),$e->{subtype};
 			}
 
-			warn unless defined $e->{kernel};
+			warn __('No kernel') unless defined $e->{kernel};
 			$e->{label}=$e->{title} unless defined $e->{label};
 			print {$h} q(:),$e->{tag};
 			print {$h} qq(\nset kernel $e->{kernel}\n);
@@ -422,6 +650,7 @@ my %i=(
 			print {$h} qq(item --menu $e->{tag} --default $e->{tag}-boot	Boot\n);
 			print {$h} qq(item --menu $e->{tag} --gap\n);
 			print {$h} qq(item --menu $e->{tag} $e->{under}	Back to Parrent menu\n);
+################################################################################
 			print {$h} qq(choose --menu $e->{tag} target || goto $e->{under}\nmenu --name $e->{tag} --delete\ngoto \${target}\n);
 
 			print {$h} q(:chkr-),$e->{tag}, qq(\nread kernel || clear kernel \ngoto $e->{tag}-cont\n);
@@ -430,12 +659,109 @@ my %i=(
 			print {$h} q(:),$e->{tag}, qq(-boot\necho	Loading kernel ...\n);
 			print {$h} q(kernel	${kernel} ${command} || goto debug-),$e->{tag};
 			print {$h} qq(\necho	Loading initial ramdisk ...\ninitrd	\${initrd});
+################################################################################
 			#print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
 			print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{tag}\n\n);
 		},
 	},
 	ipxe3=>{
+		basic=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			if('value'eq$e->{type}){
+			}else{
+				warn sprintf __(qq(Unknown kernel type %s)),$e->{type};
+			}
+
+			print {$h} q(:),$e->{under},'-',$e->{tag},qq(\n);
+			print {$h} join "\n", split(';', $e->{extended}), '' if defined $e->{extended};
+			print {$h} qq(goto $o\n);
+		}
+	},
+	pot=>{
+		out=>sub(\*){
+			my $h=shift;
+			do_menu(pot=>menu=>*$h,menu=>0);
+		},
+		config=>sub{
+			use POSIX qw(strftime);
+
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			print {$h} strftime(qq(# SOME DESCRIPTIVE TITLE.\n# Co).
+				qq(pyright (C) YEAR THE PACKAGE'S COPYRIGHT HO).
+				qq(LDER\n# This file is distributed under the ).
+				qq(same license as the Unboot package.\n# FIRS).
+				qq(T AUTHOR <EMAIL\@ADDRESS>, YEAR.\n#\n#, fuz).
+				qq(zy\nmsgid ""\nmsgstr ""\n"Project-Id-Versio).
+				qq(n: PACKAGE VERSION\\n"\n"Report-Msgid-Bugs-).
+				qq(To: 42656e\@gmail.com\\n"\n"POT-Creation-Da).
+				qq(te: %F %R+0000\\n"\n"PO-Revision-Date: YEAR).
+				qq(-MO-DA HO:MI+ZONE\\n"\n"Last-Translator: FU).
+				qq(LL NAME <EMAIL\@ADDRESS>\\n"\n"Language-Tea).
+				qq(m: LANGUAGE <LL\@li.org>\\n"\n"Language: \\).
+				qq(n"\n"MIME-Version: 1.0\\n"\n"Content-Type: ).
+				qq(text/plain; charset=utf8\\n"\n"Content-Tran).
+				qq(sfer-Encoding: 8bit\\n"\n\n),gmtime);
+		},
+		basic=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			my $title=$e->{title};
+			$title=~s/(["\?])/\\$1/;
+			$title=~s/([^ -~])/'\x'.ord($1)/e;
+################################################################################
+			print {$h} qq(#. Type: menu choice text\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#: $e->{file}:$e->{line}\nmsgid "$title"\nmsgstr ""\n\n);
+			print {$h} qq(#. Type: menu choice hotkey\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#: $e->{file}:$e->{line}\nmsgctxt "$title"\nmsgid "$e->{hotkey}"\nmsgstr ""\n\n) if defined $e->{hotkey};
+			return unless defined $e->{label};
+			my $label=$e->{label};
+			$label=~s/(["\?])/\\$1/;
+			$label=~s/([^ -~])/'\x'.ord($1)/e;
+			print {$h} qq(#. Type: submenu label\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#: $e->{file}:$e->{line}\nmsgid "$label"\nmsgstr ""\n\n);
+		},
+		gap=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			return unless defined $e->{title};
+			my $title=$e->{title};
+			$title=~s/(["\?])/\\$1/;
+			$title=~s/([^ -~])/'\x'.ord($1)/e;
+			print {$h} qq(#. Type: menu additional text\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#: $e->{file}:$e->{line}\nmsgid "$title"\nmsgstr ""\n\n);
+			warn __("Hotkey on unselectable entry") if defined $e->{hotkey};
+		},
+		gapvar=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			return unless defined $e->{titlet};
+			return unless defined $e->{titlef};
+			my $titlet=$e->{titlet};
+			my $titlef=$e->{titlef};
+			$titlet=~s/(["\?])/\\$1/;
+			$titlef=~s/(["\?])/\\$1/;
+			$titlet=~s/([^ -~])/'\x'.ord($1)/e;
+			$titlef=~s/([^ -~])/'\x'.ord($1)/e;
+################################################################################
+			print {$h} qq(#. Type: menu additional text\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#. Variable undefined: $e->{var}\n#: $e->{file}:$e->{line}\nmsgid "$titlef"\nmsgstr ""\n\n);
+			print {$h} qq(#. Type: menu additional text\n#. Tag: $e->{tag}\n#. Under: $e->{under}\n#. Variable defined: $e->{var}\n#: $e->{file}:$e->{line}\nmsgid "$titlet"\nmsgstr ""\n\n);
+			warn __("Hotkey on unselectable entry") if defined $e->{hotkey};
+		},
 	},
 );
 $i{pxelinux}{basic}=sub{
@@ -444,17 +770,17 @@ $i{pxelinux}{basic}=sub{
 	my $t=shift;
 	my $o=shift;
 
-	warn "unimplemented" if defined $e->{class};
-	warn "unimplemented" if defined $e->{users};
+	warn __("class unimplemented") if defined $e->{class};
+	warn __("security unimplemented") if defined $e->{users};
 	if('linux16'eq$e->{type}){
 	}elsif('linux'eq$e->{type}){
 	}elsif('multiboot'eq$e->{type}){
 	}else{
-		warn qq(unknown type $e->{type});
+		warn sprintf __(qq(Unknown kernel type %s)),$e->{type};
 	}
 
 	#todo subfile ###
-	warn unless defined $e->{kernel};
+	warn __('No kernel') unless defined $e->{kernel};
 	print {$h} ('	'x$o),q(default ),$e->{tag},qq(\n) if defined $e->{default} and ! $o;
 	print {$h} ('	'x$o),q(label ),$e->{tag},qq(\n);
 	print {$h} ('	'x$o),qq(	text help\n),('	'x($o+2)),$e->{help},qq(\n),('	'x$o),qq(\tendtext\n) if defined $e->{help};;
@@ -464,7 +790,7 @@ $i{pxelinux}{basic}=sub{
 	}elsif($e->{title}=~s/ ($e->{hotkey})/ ^$1/i){
 	}elsif($e->{title}=~s/($e->{hotkey})/^$1/i){
 	}else{
-		warn "unmarked hotkey on $e->{tag}: $e->{title}";
+		warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 	}
 	print {$h} ('	'x$o),q(	menu label ),$e->{title},qq(\n) if defined $e->{title};
 	print {$h} ('	'x$o),q(	kernel ),$e->{kernel},qq(\n);
@@ -487,17 +813,22 @@ $i{grub}{basic}=sub{
 	}elsif('multiboot'eq$e->{type}){
 		$t2='error';
 	}else{
-		warn qq(unknown type $e->{type});
+		warn sprintf __(qq(Unknown kernel type %s)),$e->{type};
 	}
 
-	warn unless defined $e->{kernel};
+	warn __('No kernel') unless defined $e->{kernel};
 	print {$h} ('	'x$o),q(menuentry '),$e->{title},q(');
 	print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 	print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
-	print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading kernel ...'\n),('	'x$o);
+	my $ks=$e->{kernel};$ks=~s! .*$!!;$ks=~s!^.*/!!;
+	print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading Kernel: $ks ...'\n),('	'x$o);
 	print {$h} qq(	$e->{type}	$e->{kernel});
 	print {$h} qq( $e->{command}) if defined $e->{command};
-	print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk ...'\n),('	'x$o),qq(	$t2	$e->{initrd}) if defined $e->{initrd};
+	if(defined $e->{initrd}){
+		my $ms=$e->{initrd};$ms=~s! .*$!!;$ms=~s!^.*/!!;
+################################################################################
+		print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk: $ms ...'\n),('	'x$o),qq(	$t2	$e->{initrd});
+	}
 	print {$h} qq(\n),('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
 };
 $i{ipxe1}{basic}=sub{
@@ -506,8 +837,8 @@ $i{ipxe1}{basic}=sub{
 	my $t=shift;
 	my $o=shift;
 
-	warn "unimplemented" if defined $e->{class};
-	warn "unimplemented" if defined $e->{users};
+	warn __("class unimplemented") if defined $e->{class};
+	warn __("security unimplemented") if defined $e->{users};
 	#todo kfreebsd
 	if('kfreebsd'eq$e->{type}){
 		return;
@@ -525,7 +856,7 @@ $i{ipxe1}{basic}=sub{
 	}elsif('sanboot'eq$e->{type}){
 	}elsif('sanhook'eq$e->{type}){
 	}else{
-		warn qq(unknown type $e->{type});
+		warn sprintf __(qq(Unknown kernel type %s)),$e->{type};
 	}
 
 	$e->{label}=$e->{title} unless defined $e->{label};
@@ -534,7 +865,7 @@ $i{ipxe1}{basic}=sub{
 	}elsif($e->{title}=~s/ ($e->{hotkey})/ ($1)/i){
 	}elsif($e->{title}=~s/($e->{hotkey})/($1)/i){
 	}else{
-		warn "unmarked hotkey on $e->{tag}: $e->{title}";
+		warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 	}
 	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title}\n);
 };
@@ -551,34 +882,21 @@ $i{ipxe2}{basic}=sub{
 	}elsif('multiboot'eq$e->{type}){
 	}elsif('ipxelong'eq$e->{type}){
 	}else{
-		warn qq(unknown type $e->{type});
+		warn sprintf __(qq(Unknown kernel type %s)),$e->{type};
 	}
 
-	warn unless defined $e->{kernel};
+	warn __('No kernel') unless defined $e->{kernel};
 	print {$h} q(:),$e->{tag};
 	print {$h} qq(\necho	Loading kernel ...\n);
 	print {$h} qq(kernel	$e->{kernel});
 	print {$h} qq( $e->{command}) if defined $e->{command};
+################################################################################
 	print {$h} qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$e->{initrd}) if defined $e->{initrd};
 	print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
 	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
 };
-$i{ipxe3}{basic}=sub{
-	my $h=shift; #handle
-	my $e=shift; #entry
-	my $t=shift;
-	my $o=shift;
 
-	if('value'eq$e->{type}){
-	}else{
-		warn qq(unknown type $e->{type});
-	}
-
-	print {$h} q(:),$e->{under},'-',$e->{tag},qq(\n);
-	print {$h} join "\n", split(';', $e->{extended}), '' if defined $e->{extended};
-	print {$h} qq(goto $o\n);
-};
 sub entry($\*$;$$){
 	my $t=shift; #target
 	my ($h,$e)=@_;
@@ -588,33 +906,22 @@ sub entry($\*$;$$){
 	}elsif($i{$t}{basic}){
 		return $i{$t}{basic}(@_);
 	}else{
-		die "unknown type $t";
+		die sprintf __("Unknown type '%s'"),$t;
 	}
 }
 sub out($\*){
 	my $t=shift; #target
 	my $h=shift; #handle
 
-	print {$h} qq(#!$t\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by netmenubuilder.\n#\n\n### BEGIN $0: $ARGV ###\n);
+	die __("Unknown format requested") unless defined $i{$t};
+################################################################################
+	printf {$h} __(qq(#!%s\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by netmenubuilder.\n#\n\n### BEGIN %s: %s ###\n)), $t, $0, $ARGV unless 'pot'eq$t;
 	open my $lib, '<', $t.'.lib' or die;
 	print {$h} $_ while(<$lib>);
 	close $lib;
 	$i{$t}{out}($h);
-	print {$h} qq(### END $0: $ARGV ###\n);
+	printf {$h} __(qq(### END %s: %s ###\n)),$0,$ARGV unless 'pot'eq$t;
 }
-$i{pxelinux}{out}=sub (\*){
-	my $h=shift;
-
-	do_menu(pxelinux=>menu=>*$h,menu=>0);
-};
-$i{grub}{out}=sub (\*){
-	my $h=shift;
-
-	do_menu(grub=>menu=>*$h,menu=>0);
-	foreach my $e (@order){
-		next unless defined $e;
-	}
-};
 sub do_menu($$\*;$$){
 	my $g=shift;
 	my $m=shift;
@@ -626,42 +933,38 @@ sub do_menu($$\*;$$){
 	foreach my $e (@order){
 		next unless defined $e;
 		unless(defined $e->{type}){
-			warn 'undefined type for entry';
+			warn __('Undefined type for entry');
 			$e=undef;
 			next;
 		}
-		next unless $e->{under}eq$m;
-		next if(defined $e->{only}); # meaning inverted by parser
+		unless('pot'eq$g){
+			next unless $e->{under}eq$m;
+			next if(defined $e->{only}); # meaning inverted by parser
+		}
 		entry($g,*$h,$e,$t,$o);
 	}
 }
-$i{ipxe}{out}=sub (\*){
-	my $h=shift;
-
-	print {$h} qq(:menu\nmenu --name menu\n);
-	do_menu(ipxe1=>menu=>*$h,menu=>0);
-	print {$h} qq(choose --menu menu target || exit\nmenu --name menu --delete\ngoto \${target}\n\n);
-	foreach my $e (@order){
-		next unless defined $e;
-		unless(defined $e->{type}){
-			warn 'undefined type for entry';
-			next;
-		}
-		next if(defined $e->{only}); # meaning inverted by parser
-		entry('ipxe2',*$h,$e,menu=>0);
-	}
-};
 
 my $mode=shift;
-my $count=0;
+my $count=-1;
+my $marker=0;
 
 while (<>){
+	unless($marker){
+		$marker++; $count++;
+		$order[$count]{file}=$ARGV;
+		($menudomain{$ARGV}=$ARGV)=~s/\.menu$//;
+		$menudomain{$ARGV}=~s!^.*/([^/]*)!$1!;
+		$order[$count]{line}=$.;
+	}
 	next if /^[ 	]*[#;]/;
 	next if m!^[ 	]*//!;
 	next if m!^[ 	]*$!;
 	if(/^\[([0-9a-zA-Z-]+)\]/){
 		$count++;
 		$order[$count]{tag}=$1;
+		$order[$count]{file}=$ARGV;
+		$order[$count]{line}=$.;
 	}else{
 		s!^[ 	]*!!;
 		s![ 	]*$!!;
@@ -672,9 +975,13 @@ while (<>){
 		}elsif(/^([0-9a-zA-Z]+)[ 	]*=[ 	]*(.*)$/){
 			$order[$count]{lc($1)}=$2;
 		}else{
-			warn $_;
-			die die die 'bad format';
+			die sprintf __('bad line format: %s'), $_;
 		}
+	}
+} continue {
+	if(eof){  # Not eof()!
+		close ARGV;
+		$marker=0;
 	}
 }
 foreach my $e (@order){
