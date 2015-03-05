@@ -8,7 +8,7 @@ use Locale::TextDomain 'unboot';
 my @order=({(type=>'config')});
 my %lines=();
 my %menudomain=();
-my $target='net';
+my %go=(target=>'net');
 
 sub do_menu($$\*;$$);
 sub entry($\*$;$$);
@@ -46,6 +46,294 @@ sub xwarn($@){
 	my $p=shift @c;
 	warn sprintf __("%s at %s line %d, %s line %d\n"), join(' ',@_), @c;
 }
+sub sudochk{
+	open my $fh, '-|', qw(sudo -l), @_ or return 0;
+	my $list=join '', <$fh>;
+	return $_[0]eq$list;
+}
+
+sub super{
+	if($>>0){
+		my $cmd=my $base=shift;
+		$base=~s!^.*/([^/]*$)!$1!;
+		unless(system qw(super -t -r), $cmd, $base, @_){return system qw(super -r), $cmd, $base, @_}
+		if(sudochk $cmd){return system qw(sudo), $cmd, @_}
+		warn sprintf __('Not able to gain root permision to run "%s", trying anyway . . .'), $cmd;
+		return system @_;
+	}else{
+		return system @_;
+	}
+}
+
+sub superopen(*$@){
+	use Symbol 'qualify_to_ref';
+	my $fh=qualify_to_ref(shift,caller);
+	my $mode=shift;
+	die unless $mode=~/^[-|]{2}$/;
+	if($>>0){
+		my $cmd=my $base=shift;
+		$base=~s!^.*/([^/]*$)!$1!;
+		unless(system qw(super -t -r), $cmd, $base, @_){return open $fh, $mode, qw(super -r), $cmd, $base, @_;}
+		if(sudochk $cmd){return open $fh, $mode, qw(sudo), $cmd, @_;}
+		warn sprintf __('Not able to gain root permision to run "%s", trying anyway . . .'), $cmd;
+		return open $fh, $mode, $cmd, @_;
+	}else{
+		return open $fh, $mode, @_;
+	}
+}
+
+sub grub_mkrelpath($){
+	my $path=shift;
+	local $_;
+	local $/="\n";
+	open(my $fh, '-|', qw(/usr/bin/grub-mkrelpath), $path);
+	my @a=<$fh>;
+	map {chomp} @a;
+	#warn join ', ', map {"'$_'"} @a;
+	return 1,@a if close $fh;
+	die if $!;
+	return $?,@a;
+}
+
+sub grub_probe($$){
+	my $test=shift;# which test are we doing
+	my $obj=shift;# and what are we doing it to
+	local *FH;
+	local $_;
+	local $/="\n";
+	superopen(FH, '-|', qw(/usr/sbin/grub-probe -t), $test, $obj);
+	my @a=<FH>;
+	map {chomp} @a;
+	#warn join ', ', map {"'$_'"} @a;
+	return 1,@a if close FH;
+	die if $!;
+	return $?,@a;
+}
+
+sub grub_probe_d($$){
+	my $test=shift;# which test are we doing
+	my $obj=shift;# and what are we doing it to
+	local *FH;
+	local $_;
+	local $/="\n";
+	#warn "'$obj'";
+	superopen(FH, '-|', qw(/usr/sbin/grub-probe -dt), $test, $obj);
+	my @a=<FH>;
+	map {chomp} @a;
+	#warn join ', ', map {"'$_'"} @a;
+	return 1,@a if close FH;
+	die if $!;
+	return $?,@a;
+}
+
+sub is_path_readable_by_grub($){
+	my$path=shift;
+
+	# abort if path doesn't exist
+	return 0 unless defined $path;
+	return 0 unless -e $path;
+
+	# abort if file is in a filesystem we can't read
+	my @a=grub_probe fs=>$path;
+	#warn join ', ', @a;
+	return 0 unless $a[0];
+
+	# ... or if we can't figure out the abstraction module, for example if
+	# memberlist fails on an LVM volume group.
+	my @abstraction=grub_probe abstraction=>$path;
+	#warn join ', ', @abstraction;
+	return 0 unless shift @abstraction;
+
+	### todo
+	#if [ x$GRUB_ENABLE_CRYPTODISK = xy ]; then
+	#	return 0
+	#fi
+
+	#for abstraction in $abstractions; do
+	# 	if [ "x$abstraction" = xcryptodisk ]; then
+	#		return 1
+	#	fi
+	#done
+
+	return 1;
+}
+
+sub prepare_grub_to_access_device($){
+	my $dev=shift;
+	my @line;
+	local $_;
+
+	my @partmap=grub_probe_d partmap=>$dev;		die unless shift @partmap;
+	foreach(@partmap){
+		if(/^netbsd$/){push @line, "insmod part_bsd\n";next;}
+		if(/^openbsd$/){push @line, "insmod part_bsd\n";next;}
+		push @line, "insmod part_$_\n";
+	}
+
+#	loop_file=
+#	case $1 in
+#		/dev/loop/*|/dev/loop[0-9])
+#			grub_loop_device="${1#/dev/}"
+#			loop_file=`losetup "$1" | sed -e "s/^[^(]*(\([^)]\+\)).*/\1/"`
+#			case $loop_file in
+#				/dev/*) ;;
+#				*)
+#					loop_device="$1"
+#					shift
+#					set -- `"${grub_probe}" --target=device "${loop_file}"` "$@" || return 0
+#				;;
+#			esac
+#		;;
+#	esac
+
+	# Abstraction modules aren't auto-loaded.
+	my @abstraction=grub_probe_d abstraction=>$dev;		die unless shift @abstraction;
+	push @line, "insmod $_\n" foreach(@abstraction);
+
+	my @fs=grub_probe_d fs=>$dev;				die unless shift @fs;
+	push @line, "insmod $_\n" foreach(@fs);
+
+#	if [ x$GRUB_ENABLE_CRYPTODISK = xy ]; then
+#			for uuid in "`"${grub_probe}" --device $@ --target=cryptodisk_uuid`"; do
+#		echo "cryptomount -u $uuid"
+#			done
+#	fi
+
+	# If there's a filesystem UUID that GRUB is capable of identifying, use it;
+	# otherwise set root as per value in device.map.
+	my @fs_hint=grub_probe_d compatibility_hint=>$dev;	die unless shift @fs_hint;
+	push @line, "set root='$_'\n" foreach(@fs_hint);
+	my @hints=grub_probe_d hints_string=>$dev;			die unless shift @hints;
+	my @fs_uuid=grub_probe_d fs_uuid=>$dev;			die unless shift @fs_uuid;
+	foreach(@fs_uuid){
+		#warn join ', ', map {"'$_'"} @hints;
+		if(@hints){
+			push @line, "if [ x\$feature_platform_search_hint = xy ]; then\n";
+			push @line, "\tsearch --no-floppy --fs-uuid --set=root @hints $_\n";
+			push @line, "else\n";
+			push @line, "\tsearch --no-floppy --fs-uuid --set=root $_\n";
+			push @line, "fi\n";
+		}else{
+			push @line, "search --no-floppy --fs-uuid --set=root $_\n";
+		}
+	}
+
+#	if [ "x${loop_file}" != x ]; then
+#		loop_mountpoint="$(awk '"'${loop_file}'" ~ "^"$2 && $2 != "/" { print $2 }' /proc/mounts | tail -n1)"
+#		if [ "x${loop_mountpoint}" != x ]; then
+#			echo "loopback ${grub_loop_device} ${loop_file#$loop_mountpoint}"
+#			echo "set root=(${grub_loop_device})"
+#		fi
+#	fi
+	return @line;
+}
+
+sub prepare_grub_to_access_file($){
+	my$path=shift;
+	my @d=grub_probe device=>$path;
+	#warn join ', ', @a;
+	return 0 unless $d[0];
+	return prepare_grub_to_access_device($d[1]);
+}
+
+sub is_path_readable($){
+	my$path=shift;
+	return 1 if 'net'eq$go{target};
+	return is_path_readable_by_grub($path) if 'grub'eq$go{bl};
+	return 0;
+}
+
+sub prepare_to_access_file($){
+	my$path=shift;
+	return () if 'net'eq$go{target};
+	return prepare_grub_to_access_file($path) if 'grub'eq$go{bl};
+	return ();
+}
+
+sub make_system_path_relative_to_its_root($){
+	my$path=shift;
+	return $path if 'net'eq$go{target};
+	if('grub'eq$go{bl}){
+		my @l = grub_mkrelpath($path);
+		die unless shift @l;
+		return '($root)'.$l[0];
+	};
+	return $path;
+}
+
+sub file_probe($$){
+	my$target=shift;
+	my$path=shift;
+	return 'net' if 'net'eq$go{target};
+	if('grub'eq$go{bl}){
+		my @d=grub_probe device=>$path;
+		die unless shift @d;
+		return $d[0];
+	};
+	return ();
+}
+
+sub grub_load_fonts_and_gfxmod($$$@){
+	my $h=shift; #handle
+	my $o=shift;
+	my $all=shift;
+
+	local $_;
+	my (%mod,@font);
+
+	foreach my $path(@_){
+		next unless is_path_readable ${path};
+		unless(defined $path){
+			next;
+		}elsif(ref $path){
+			warn $path;
+			warn join ', ', map {"'$_'"} caller;
+			die;
+		}elsif(-d $go{prefix}.$path){
+			open my $fh, '-|', 'find', $go{prefix}.$path, qw( ( -iname *.pf2 -o -iname *.jpg -o -iname *.jpeg -o -iname *.tga -o -iname *.png ) -print0) or die __('Cannot run find!');
+			local $/=chr 0;
+			my @ft;
+			while(<$fh>){
+				chomp;
+				if(/\.png/i){$mod{png}++;next;}
+				if(/\.jpg/i){$mod{jpeg}++;next;}
+				if(/\.jpeg/i){$mod{jpeg}++;next;}
+				if(/\.tga/i){$mod{tga}++;next;}
+				s/^$go{prefix}//;
+				if(/\.pf2/i){push @ft,$_;next;}
+				warn $_;
+			}
+			push @font, sort @ft;
+		}elsif(-f $go{prefix}.$path){
+			foreach($go{prefix}.$path){
+				chomp;
+				if(/\.png/i){$mod{png}++;next;}
+				if(/\.jpg/i){$mod{jpeg}++;next;}
+				if(/\.jpeg/i){$mod{jpeg}++;next;}
+				if(/\.tga/i){$mod{tga}++;next;}
+				if(/\.pf2/i){push @font,$path;next;}
+				warn $_;
+			}
+		}else{
+			die sprintf __("Path is not file or directory: '%s'"), $path;
+		}
+	}
+	printf {$h} ('	'x$o)."if ! insmod %s; then return 1; fi\n",$_ foreach(sort keys %mod);
+	my $last='';
+	foreach my $path(@font){
+		my $cur=file_probe device=>$path;
+		unless($cur eq$last){
+			$last=$cur;
+			print {$h} map {s/^(insmod .*)$/if ! $1; then return 1; fi/;('	'x$o).$_} prepare_to_access_file($path);
+		}
+		$path=make_system_path_relative_to_its_root $path;
+		if($all){
+			printf {$h} ('	'x$o)."if ! loadfont %s; then return 1; fi\n",$path;
+		}else{
+			printf {$h} ('	'x$o)."if loadfont %s; then return 0; fi\n",$path;
+		}
+	}
+}
 
 my %i=(
 	grub=>{
@@ -64,18 +352,45 @@ my %i=(
 			my $o=shift;
 
 			warn if $e ne $order[0];
-			$target=$e->{target} if defined $e->{target};
+			$e->{prefix}=''unless $e->{prefix};
+			$go{prefix}=$e->{prefix} if defined $e->{prefix};
+			$go{target}=$e->{target} if defined $e->{target};
+			$go{bl}='grub';
 			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
-			print {$h} << 'EOF';
-function load_video {
-	if [ x$feature_default_font_path = xy ] ; then
-		font=unicode
-	else
-		font=$prefix/unicode.pf2
-	fi
-	if loadfont $font ; then
+			print {$h} "function load_theme {\n";
+			if($e->{grub_theme} && -f $e->{prefix}.$e->{grub_theme} && is_path_readable($e->{prefix}.$e->{grub_theme})){
+				print {$h} "\tif ! insmod gfxmenu; then return 1; fi\n";
+				my $themedir=$e->{grub_theme};
+				$themedir=~s!/[^/]*$!!;
+				grub_load_fonts_and_gfxmod($h,$o+1,1,$themedir);
+				printf {$h} "\tset theme=%s\n", make_system_path_relative_to_its_root($e->{grub_theme});
+			}else{
+				print {$h} "\tfalse\n";
+				warn sprintf __('Grub theme not readable by boot loader %s'), $e->{grub_theme} if $e->{grub_theme};
+				#warn sprintf __('Grub theme not readable by script %s'), $e->{grub_theme} if ! -f $e->{grub_theme};
+			}
+			print {$h} "}\n\nfunction load_background {\n";
+			if($e->{grub_background}){
+				grub_load_fonts_and_gfxmod($h,$o+1,1,$e->{grub_background});
+				print {$h} map {s/^(insmod .*)$/if ! $1; then return 1; fi/;s/^/\t/;$_} prepare_to_access_file($e->{grub_background});
+				printf {$h} "\tif ! background_image -m stretch %s; then return 1; fi\n", make_system_path_relative_to_its_root($e->{grub_background});
+			}else{
+				print {$h} "\tfalse\n";
+			}
+			print {$h} "}\n\nfunction load_font {\n";
+			grub_load_fonts_and_gfxmod($h,$o+1,0,$e->{grub_font})if defined $e->{grub_font};
+			print {$h} "\tif [ x\$feature_default_font_path = xy ] ; then\n";
+			printf {$h} "\t\tif loadfont %s; then return 0; fi\n",$_ foreach(qw(unicode unifont ascii));
+			print {$h} "\t\treturn 1\n";
+			print {$h} "\telse\n";
+			grub_load_fonts_and_gfxmod($h,$o+2,0, grep {-e} map {my @a;foreach my $base(qw(unicode unifont ascii)){push @a,"$_/$base.pf2"}@a} ('disk'eq$go{target}?qw(/boot/grub /usr/share/grub):()));
+			print {$h} "\t\treturn 1\n";
+			print {$h} "\tfi\n";
+			print {$h} "}\n\nfunction load_video {\n";
+			print {$h} "\tif load_font ; then\n";
+			print {$h} << "EOF";
 		set gfxmode=auto
-		if [ x$feature_all_video_module = xy ]; then
+		if [ x\$feature_all_video_module = xy ]; then
 			insmod all_video
 		else
 			insmod efi_gop
@@ -87,31 +402,20 @@ function load_video {
 			insmod video_cirrus
 		fi
 		if insmod gfxterm; then
-			terminal_output --append gfxterm
+			if terminal_output --append gfxterm ; then
+				terminal_output --remove console
+			fi
 		fi
-		set locale_dir=$prefix/locale
-		if [ -n "${1}" ] ; then
-			set lang="${1}"
-		else
-EOF
-			print {$h} << "EOF" if(defined $e->{lang});
-			set lang=$e->{lang}
-EOF
-			print {$h} << 'EOF';
+		set locale_dir=\$prefix/locale
+		if [ -n "\${1}" ] ; then
+			set lang="\${1}"
 		fi
 		insmod gettext
-		insmod png
 	fi
 
-	if insmod gfxmenu; then
-		loadfont $prefix/themes/starfield/dejavu_10.pf2
-		loadfont $prefix/themes/starfield/dejavu_12.pf2
-		loadfont $prefix/themes/starfield/dejavu_14.pf2
-		loadfont $prefix/themes/starfield/dejavu_16.pf2
-		loadfont $prefix/themes/starfield/dejavu_bold_14.pf2
-		set theme=$prefix/themes/starfield/theme.txt
+	if load_theme; then
 		export theme
-	elif background_image $prefix/joy-grub.png; then
+	elif load_background; then
 		set color_normal=white/black
 		set color_highlight=black/white
 	else
@@ -120,14 +424,8 @@ EOF
 	fi
 }
 
-if cpuid -l ; then
-	set arch=amd64
-else
-	set arch=i386
-fi
-
 EOF
-			print {$h} << 'EOF' if 'disk'eq$target;
+			print {$h} << 'EOF' if 'disk'eq$go{target};
 if [ -s $prefix/grubenv ]; then
 	load_env
 	set have_grubenv=true
@@ -143,7 +441,7 @@ EOF
 else
 	set default="$e->{default}"
 EOF
-			print {$h} << 'EOF' if 'disk'eq$target;
+			print {$h} << 'EOF' if 'disk'eq$go{target};
 fi
 
 EOF
@@ -176,7 +474,6 @@ else
 fi
 
 EOF
-			print {$h} ('	'x$o), "set prefix=\"/grub\"\n";
 			print {$h} ('	'x$o), "load_video \"$e->{lang}\"\n";
 			print {$h} ('	'x$o), "start_ser\n\n";
 		},
@@ -259,6 +556,7 @@ EOF
 			print {$h} ('	'x$o),q(submenu '),___t($e),q(');
 			print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 			print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+			print {$h} q( $menuentry_id_option '),$e->{id},q(') if defined $e->{id};
 			print {$h} qq( {\n);
 			do_menu(grub=>$e->{tag},*$h,$t,$o+1);
 			print {$h} ('	'x$o),qq(}\n);
@@ -820,14 +1118,22 @@ $i{grub}{basic}=sub{
 	print {$h} ('	'x$o),q(menuentry '),$e->{title},q(');
 	print {$h} ' --users ',"'", $e->{users},"'" if defined $e->{users};
 	print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
+	print {$h} q( $menuentry_id_option '),$e->{id},q(') if defined $e->{id};
+	print {$h} qq( {\n);
+	print {$h} ('	'x($o+1)),qq(insmod gzio\n);
+	print {$h} ('	'x($o+1)),qq(if [ x\$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi\n);
+	print {$h} map {
+		#s/^(insmod .*)$/if ! $1; then return 1; fi/;
+		('	'x($o+1)),$_
+		} prepare_to_access_file($e->{kernel});
 	my $ks=$e->{kernel};$ks=~s! .*$!!;$ks=~s!^.*/!!;
-	print {$h} qq( {\n),('	'x$o),qq(	echo	'Loading Kernel: $ks ...'\n),('	'x$o);
-	print {$h} qq(	$e->{type}	$e->{kernel});
+	print {$h} ('	'x$o),qq(	echo	'Loading Kernel: $ks ...'\n),('	'x$o);
+	print {$h} qq(	$e->{type}	),make_system_path_relative_to_its_root $e->{kernel};
 	print {$h} qq( $e->{command}) if defined $e->{command};
 	if(defined $e->{initrd}){
 		my $ms=$e->{initrd};$ms=~s! .*$!!;$ms=~s!^.*/!!;
 ################################################################################
-		print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk: $ms ...'\n),('	'x$o),qq(	$t2	$e->{initrd});
+		print {$h} qq(\n),('	'x$o),qq(	echo	'Loading initial ramdisk: $ms ...'\n),('	'x$o),qq(	$t2	),make_system_path_relative_to_its_root $e->{initrd};
 	}
 	print {$h} qq(\n),('	'x$o),qq(	echo	'Booting ...'\n),('	'x$o),qq(}\n);
 };
@@ -972,14 +1278,14 @@ while (<>){
 			my @a = grep {$_ eq$mode} split /,/, $2;
 			next if scalar @a;
 			$order[$count]{lc($1)}++;
-		}elsif(/^([0-9a-zA-Z]+)[ 	]*=[ 	]*(.*)$/){
+		}elsif(/^([0-9a-zA-Z_]+)[ 	]*=[ 	]*(.*)$/){
 			$order[$count]{lc($1)}=$2;
 		}else{
 			die sprintf __('bad line format: %s'), $_;
 		}
 	}
 } continue {
-	if(eof){  # Not eof()!
+	if(eof){	# Not eof()!
 		close ARGV;
 		$marker=0;
 	}

@@ -24,3 +24,16 @@ function savedefault {
 	fi
 }
 
+if cpuid -l ; then
+	set arch=amd64
+else
+	set arch=i386
+fi
+export arch
+
+function gfxmode {
+	set gfxpayload="${1}"
+}
+set linux_gfx_mode=
+export linux_gfx_mode
+

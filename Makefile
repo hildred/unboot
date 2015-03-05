@@ -9,7 +9,7 @@ test: all
 	true
 
 grub:
-	grub-mknetdir --compress=xz --net-directory=/tftpboot --subdir=grub --modules="bufio normal boot gfxterm video video_fb png echo multiboot bsd echo cpuid gzio minicmd test"
+	grub-mknetdir --compress=xz --net-directory=/tftpboot --subdir=grub --modules="bufio normal boot gfxterm video video_fb png echo echo gzio minicmd test"
 
 %.set: %.grub %.ipxe %.slcfg
 
@@ -55,7 +55,7 @@ default.amd64.cfg: default.cfg Makefile expandvars
 #diff: all
 #	diff -q menu.ipxe boot.hold|| gvimdiff -f menu.ipxe boot.hold
 #	diff -q default.cfg menu.cfg ||gvimdiff -f default.cfg menu.cfg
-diff: all debhd.grub
+diff: all debhd.grub grubtemp
 	diff -q menu.ipxe boot|| gvimdiff -f menu.ipxe boot
 	diff -q grub.cfg ../tftpboot/grub2/grub.cfg||gvimdiff -f grub.cfg ../tftpboot/grub2/grub.cfg
 	diff -q grubtemp /boot/grub/grub.cfg ||EDITOR='gvimdiff -f grubtemp' sudoedit /boot/grub/grub.cfg
