@@ -53,7 +53,7 @@
 	title	= Chain PXELINUX
 	type	= ipxelong
 	only	= ipxe
-	kernel	= /tftpboot/pxelinux-${arch}.0
+	kernel	= /tftpboot/pxelinux.0
 	under	= debian
 [grub2pxe]
 	title	= Chain grub2pxe
