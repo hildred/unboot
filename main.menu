@@ -1,7 +1,7 @@
-
 [live]
 	title	= Live
 	type	= submenu
+	hotkey	= l
 [dlive]
 	title	= Live
 	type	= linux
@@ -25,29 +25,43 @@
 [games]
 	title	= Games
 	type	= submenu
-[keen]
-	title	= keen
+	hotkey	= g
+[keen1]
+	title	= keen1
 	type	= memdisk
 	initrd	= /tftpboot/keen.img
+	command	= command=keen1
+	hotkey	= 1
+	under	= games
+[keen4]
+	title	= keen4
+	type	= memdisk
+	initrd	= /tftpboot/keen.img
+	command	= command=keen4e
+	hotkey	= 4
 	under	= games
 [invaders]
 	title	= GRUB Invaders
 	type	= multiboot
 	kernel	= /tftpboot/invaders.exec
 	under	= games
+	hotkey	= i
 [installers]
 	title	= Installers
 	type	= submenu
+	hotkey	= i
 [debian]
 	title	= Debian
 	type	= submenu
 	under	= installers
+	hotkey	= d
 [grub]
 	title	= Chain grub
 	type	= ipxelong
 	only	= ipxe
-	kernel	= tftp://192.168.219.201/grub/grub.pxe
+	kernel	= tftp://192.168.218.201/grub/i386-pc/core.0
 	#-${arch}
+	hotkey	= g
 	under	= debian
 [pxelinux]
 	title	= Chain PXELINUX
@@ -60,6 +74,7 @@
 	type	= ipxelong
 	only	= ipxe
 	kernel	= /tftpboot/grub2pxe-${arch}
+	hotkey	= 2
 	under	= debian
 [linux]
 	title	= Linux
@@ -75,6 +90,7 @@
 [expert]
 	under	= linux
 	title	= Install Debian (Expert)
+	hotkey	= e
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= priority=low DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
@@ -140,19 +156,23 @@
 [utilities]
 	title	= Utilities
 	type	= submenu
+	hotkey	= u
 [shell]
 	title	= Enter iPXE shell
 	only	= ipxe
 	type	= exit
 	exit	= shell
 	under	= utilities
+	hotkey	= s
 [config]
 	title	= Config
 	only	= ipxe
 	type	= exit
 	exit	= config
 	under	= utilities
+	hotkey	= c
 [gparted]
+	hotkey	= p
 	title	= gparted
 	type	= linux16
 	kernel	= /tftpboot/gparted/vmlinuz
@@ -168,6 +188,7 @@
 	under	= utilities
 	title	= Memory test (memtest86+)
 	type	= submenu
+	hotkey	= m
 [mtp86c]
 	under	= mtp86
 	title	= Memory test (memtest86+)
@@ -194,7 +215,9 @@
 	title	= Exit
 	type	= submenu
 	only	= ipxe,grub
+	hotkey	= x
 [exitx]
+	hotkey	= n
 	under	= exit
 	title	= Next boot device
 	type	= exit
@@ -204,7 +227,9 @@
 	title	= reboot
 	type	= exit
 	exit	= reboot
+	hotkey	= r
 [other]
+	hotkey	= o
 	title	= Other
 	type	= submenu
 [winpe]
@@ -214,7 +239,9 @@
 	only	= ipxe
 	kernel	= /tftpboot/wimboot
 	xinitrd	= /tftpboot/winpe/${arch}/ISO/bootmgr	bootmgr:../tftpboot/winpe/${arch}/ISO/boot/bcd	BCD:../tftpboot/winpe/${arch}/ISO/boot/boot.sdi boot.sdi:../tftpboot/winpe/${arch}/winpe.wim	boot.wim
+	hotkey	= p
 [freedos]
+	hotkey	= f
 	under	= other
 	title	= freedos
 	type	= memdisk
@@ -224,7 +251,9 @@
 	title	= dos2
 	type	= memdisk
 	initrd	= /tftpboot/fdnwd288.img
+	hotkey	= 2
 [netdos]
+	hotkey	= n
 	under	= other
 	title	= netdos
 	type	= memdisk

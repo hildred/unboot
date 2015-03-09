@@ -2,16 +2,16 @@
 	default	= true
 	title	= Graphical Install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= I
 [install-txt]
 	title	= Text Install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd.gz
+	initrd	= debian-installer/${arch}/initrd.gz
 	hotkey	= T
 [advanced]
 	title	= Advanced options
@@ -22,25 +22,25 @@
 	under	= advanced
 	title	= Expert install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= E
 [rescue]
 	under	= advanced
 	title	= Rescue mode
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 rescue/enable=true -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= R
 [auto]
 	under	= advanced
 	title	= Automated install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= A
 [desktop]
 	under	= advanced
@@ -61,9 +61,9 @@
 	under	= kde-desktop
 	title	= Install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 [advanced-kde]
 	under	= kde-desktop
 	title	= Advanced options
@@ -73,17 +73,17 @@
 	under	= advanced-kde
 	title	= Expert install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= E
 [auto-kde]
 	under	= advanced-kde
 	title	= Automated install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= A
 [help-kde]
 	under	= kde-desktop
@@ -91,7 +91,7 @@
 	only	= pxelinux
 	help	= Display help screens; type 'menu' at boot prompt to return to this menu
 	title	= Help
-	file	= debian-installer/i386/boot-screens/kde/prompt.cfg
+	file	= debian-installer/${arch}/boot-screens/kde/prompt.cfg
 	hotkey	= H
 [lxde-desktop]
 	under	= desktop
@@ -105,9 +105,9 @@
 	under	= lxde-desktop
 	title	= Install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= I
 [advanced-lxde]
 	under	= lxde-desktop
@@ -118,17 +118,17 @@
 	under	= advanced-lxde
 	title	= Expert install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= E
 [auto-lxde]
 	under	= advanced-lxde
 	title	= Automated install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= A
 [help-lxde]
 	under	= lxde-desktop
@@ -136,7 +136,7 @@
 	only	= pxelinux
 	help	= Display help screens; type 'menu' at boot prompt to return to this menu
 	title	= Help
-	file	= debian-installer/i386/boot-screens/lxde/prompt.cfg
+	file	= debian-installer/${arch}/boot-screens/lxde/prompt.cfg
 	hotkey	= H
 [xfce-desktop]
 	under	= desktop
@@ -150,9 +150,9 @@
 	under	= xfce-desktop
 	title	= Install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= I
 [advanced-xfce]
 	under	= xfce-desktop
@@ -163,17 +163,17 @@
 	under	= advanced-xfce
 	title	= Expert install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= E
 [auto-xfce]
 	under	= advanced-xfce
 	title	= Automated install
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= A
 [help-xfce]
 	under	= xfce-desktop
@@ -181,19 +181,19 @@
 	only	= pxelinux
 	help	= Display help screens; type 'menu' at boot prompt to return to this menu
 	title	= Help
-	file	= debian-installer/i386/boot-screens/xfce/prompt.cfg
+	file	= debian-installer/${arch}/boot-screens/xfce/prompt.cfg
 	hotkey	= H
 [help]
 	type	= subfile
 	only	= pxelinux
 	help	= Display help screens; type 'menu' at boot prompt to return to this menu
 	title	= Help
-	file	= debian-installer/i386/boot-screens/prompt.cfg
+	file	= debian-installer/${arch}/boot-screens/prompt.cfg
 	hotkey	= H
 [installspk]
 	title	= Install with speech synthesis
 	type	= linux16
-	kernel	= debian-installer/i386/linux
+	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 speakup.synth=soft -- quiet
-	initrd	= debian-installer/i386/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-g.gz
 	hotkey	= s
