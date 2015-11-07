@@ -1,11 +1,15 @@
+	grub_theme=/grub/themes/starfield/theme.txt
+	grub_background=/grub/lines-grub-1920x1080.png
+	lang	= en_US
+	prefix	= /tftpboot
 [install-gtk]
 	default	= true
-	title	= Graphical Install
+	title	= Default Graphical Linux Install
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
-	hotkey	= I
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
+	hotkey	= l
 [install-txt]
 	title	= Text Install
 	type	= linux16
@@ -24,7 +28,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= E
 [rescue]
 	under	= advanced
@@ -32,7 +36,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 rescue/enable=true -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= R
 [auto]
 	under	= advanced
@@ -40,7 +44,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= A
 [desktop]
 	under	= advanced
@@ -63,7 +67,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 [advanced-kde]
 	under	= kde-desktop
 	title	= Advanced options
@@ -75,7 +79,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= E
 [auto-kde]
 	under	= advanced-kde
@@ -83,7 +87,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=kde auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= A
 [help-kde]
 	under	= kde-desktop
@@ -107,7 +111,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= I
 [advanced-lxde]
 	under	= lxde-desktop
@@ -120,7 +124,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= E
 [auto-lxde]
 	under	= advanced-lxde
@@ -128,7 +132,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=lxde auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= A
 [help-lxde]
 	under	= lxde-desktop
@@ -152,7 +156,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= I
 [advanced-xfce]
 	under	= xfce-desktop
@@ -165,7 +169,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce priority=low video=vesa:ywrap,mtrr vga=788 --
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= E
 [auto-xfce]
 	under	= advanced-xfce
@@ -173,7 +177,7 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= desktop=xfce auto=true priority=critical video=vesa:ywrap,mtrr vga=788 -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= A
 [help-xfce]
 	under	= xfce-desktop
@@ -195,5 +199,5 @@
 	type	= linux16
 	kernel	= debian-installer/${arch}/linux
 	command	= video=vesa:ywrap,mtrr vga=788 speakup.synth=soft -- quiet
-	initrd	= debian-installer/${arch}/initrd-g.gz
+	initrd	= debian-installer/${arch}/initrd-gtk.gz
 	hotkey	= s

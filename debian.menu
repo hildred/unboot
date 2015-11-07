@@ -1,3 +1,4 @@
+	lang	= en_US
 [install]
 	default	= true
 	title	= Install

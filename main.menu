@@ -1,3 +1,42 @@
+	grub_theme=/grub/themes/starfield/theme.txt
+	grub_background=/grub/lines-grub-1920x1080.png
+	lang	= en_US
+	prefix	= /tftpboot
+[san]
+	title	= Storage Area Network
+	type	= submenu
+	hotkey	= s
+	only	= ipxe
+[sanboot]
+	title	= sanboot
+	type	= sanboot
+	hotkey	= b
+	only	= ipxe
+	under	= san
+	path	= ${root-path}
+	condition = root-path
+[sanhook]
+	title	= sanhook
+	type	= sanhook
+	hotkey	= h
+	only	= ipxe
+	under	= san
+	path	= ${root-path}
+	condition = root-path
+[sanhook1]
+	title	= fixed
+	type	= sanhook
+	hotkey	= f
+	only	= ipxe
+	under	= san
+	path	= iscsi:192.168.219.13::::iqn.2003-01.org.linux-iscsi.space.i686:sn.66d521828023
+[sanhook2]
+	title	= freedos
+	type	= sanhook
+	hotkey	= d
+	only	= ipxe
+	under	= san
+	path	= ../cd/fd11src.iso
 [live]
 	title	= Live
 	type	= submenu
@@ -40,6 +79,13 @@
 	command	= command=keen4e
 	hotkey	= 4
 	under	= games
+[ripterm]
+	title	= Ripterm
+	type	= memdisk
+	initrd	= /tftpboot/rt1.img
+	command	= command=ripterm
+	hotkey	= r
+	under	= games
 [invaders]
 	title	= GRUB Invaders
 	type	= multiboot
@@ -59,23 +105,32 @@
 	title	= Chain grub
 	type	= ipxelong
 	only	= ipxe
-	kernel	= tftp://192.168.218.201/grub/i386-pc/core.0
+	kernel	= tftp://${next-server}/grub/i386-pc/core.0
 	#-${arch}
 	hotkey	= g
-	under	= debian
+	under	= installers
+[test]
+	title	= Chain grub http
+	only	= ipxe
+	type	= ipxelong
+	kernel	= /tftpboot/grub/i386-pc/core.0
+	#-${arch}
+	under	= installers
+	hotkey	= h
 [pxelinux]
 	title	= Chain PXELINUX
 	type	= ipxelong
 	only	= ipxe
 	kernel	= /tftpboot/pxelinux.0
-	under	= debian
+	under	= installers
+	hotkey	= p
 [grub2pxe]
 	title	= Chain grub2pxe
 	type	= ipxelong
 	only	= ipxe
 	kernel	= /tftpboot/grub2pxe-${arch}
 	hotkey	= 2
-	under	= debian
+	under	= installers
 [linux]
 	title	= Linux
 	type	= submenu
@@ -86,7 +141,7 @@
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
-	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
+	initrd	= /tftpboot/debian-installer/${arch}/initrd-gtk.gz
 [expert]
 	under	= linux
 	title	= Install Debian (Expert)
@@ -94,20 +149,22 @@
 	type	= linux16
 	kernel	= /tftpboot/debian-installer/${arch}/linux
 	command	= priority=low DEBCONF_DEBUG=5 video=vesa:ywrap,mtrr vga=788 url=http://${pxe_default_server}/debian/preseed.cfg -- 
-	initrd	= /tftpboot/debian-installer/${arch}/initrd-g.gz
+	initrd	= /tftpboot/debian-installer/${arch}/initrd-gtk.gz
 [kfreebsd]
 	title	= kFreeBSD
+	hotkey	= f
 	type	= submenu
 	under	= debian
 #[chkfreebsd]
-#	title	= kfreebsd install
+#	title	= kFreeBSD install
 #	type	= ipxelong
 #	only	= ipxe
 #	kernel	= /tftpboot/grub2pxe-${arch}
 #	under	= kfreebsd
 [kfreebsdn]
 	under	= kfreebsd
-	title	= Default kfreebsd install
+	title	= Default kFreeBSD install
+	hotkey	= d
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd
@@ -115,7 +172,7 @@
 	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [kfreebsda]
 	under	= kfreebsd
-	title	= Automated kfreebsd install
+	title	= Automated kFreeBSD install
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
@@ -123,7 +180,7 @@
 	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [kfreebsde]
 	under	= kfreebsd
-	title	= Expert kfreebsd install
+	title	= Expert kFreeBSD install
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd.gz
@@ -131,7 +188,8 @@
 	command	= kFreeBSD.desktop=xfce kFreeBSD.priority=low kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [kfreebsd9]
 	under	= kfreebsd
-	title	= Default kfreebsd-9 install
+	title	= Default kFreeBSD-9 install
+	hotkey	= 9
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
@@ -139,7 +197,7 @@
 	command	= kFreeBSD.desktop=xfce kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [kfreebsda9]
 	under	= kfreebsd
-	title	= Automated kfreebsd-9 install
+	title	= Automated kFreeBSD-9 install
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
@@ -147,7 +205,7 @@
 	command	= kFreeBSD.desktop=xfce kFreeBSD.auto=true kFreeBSD.priority=critical kFreeBSD.url=http://${pxe_default_server}/debian/preseed.cfg
 [kfreebsde9]
 	under	= kfreebsd
-	title	= Expert kfreebsd-9 install
+	title	= Expert kFreeBSD-9 install
 	type	= kfreebsd
 	only	= grub,pxelinux
 	kernel	= /tftpboot/debian-installer/kfreebsd-${arch}/kfreebsd-9.gz
@@ -164,6 +222,13 @@
 	exit	= shell
 	under	= utilities
 	hotkey	= s
+[login]
+	hotkey	= l
+	title	= Login
+	only	= ipxe
+	type	= exit
+	exit	= login
+	under	= utilities
 [config]
 	title	= Config
 	only	= ipxe
@@ -228,6 +293,12 @@
 	type	= exit
 	exit	= reboot
 	hotkey	= r
+[halt]
+	hotkey	= p
+	under	= exit
+	title	= Power Off
+	type	= exit
+	exit	= poweroff
 [other]
 	hotkey	= o
 	title	= Other
