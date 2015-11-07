@@ -73,6 +73,7 @@ sub superopen(*$@){
 	if($>>0){
 		my $cmd=my $base=shift;
 		$base=~s!^.*/([^/]*$)!$1!;
+		warn join ', ', @_ if grep {!defined($_)} @_;
 		unless(system qw(super -t -r), $cmd, $base, @_){return open $fh, $mode, qw(super -r), $cmd, $base, @_;}
 		if(sudochk $cmd){return open $fh, $mode, qw(sudo), $cmd, @_;}
 		warn sprintf __('Not able to gain root permision to run "%s", trying anyway . . .'), $cmd;
@@ -98,6 +99,7 @@ sub grub_mkrelpath($){
 sub grub_probe($$){
 	my $test=shift;# which test are we doing
 	my $obj=shift;# and what are we doing it to
+	die sprintf __("nosuch file '%s'"), $obj unless -e $obj;
 	local *FH;
 	local $_;
 	local $/="\n";
@@ -113,6 +115,7 @@ sub grub_probe($$){
 sub grub_probe_d($$){
 	my $test=shift;# which test are we doing
 	my $obj=shift;# and what are we doing it to
+	die unless $test and $obj;
 	local *FH;
 	local $_;
 	local $/="\n";
@@ -163,6 +166,7 @@ sub prepare_grub_to_access_device($){
 	my @line;
 	local $_;
 
+	die unless $dev;
 	my @partmap=grub_probe_d partmap=>$dev;		die unless shift @partmap;
 	foreach(@partmap){
 		if(/^netbsd$/){push @line, "insmod part_bsd\n";next;}
@@ -233,6 +237,7 @@ sub prepare_grub_to_access_file($){
 	my @d=grub_probe device=>$path;
 	#warn join ', ', @a;
 	return 0 unless $d[0];
+	die unless $d[1];
 	return prepare_grub_to_access_device($d[1]);
 }
 
@@ -357,6 +362,53 @@ my %i=(
 			$go{target}=$e->{target} if defined $e->{target};
 			$go{bl}='grub';
 			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			print {$h} << 'EOF';
+function start_ser {
+	if ! insmod serial; then
+		echo serial load failed
+		set serr=4
+	elif ! serial --unit=0 --speed=115200;then
+		echo serial conf err
+		set serr=3
+	elif ! terminal_output --append serial; then
+		echo output error
+		set serr=2
+	elif ! terminal_input --append serial; then
+		echo input set err
+		set serr=1
+	else
+		echo mark 1
+		set serr=0
+	fi
+}
+
+function savedefault {
+	if [ -z "${boot_once}" ]; then
+		saved_entry="${chosen}"
+		save_env saved_entry
+	fi
+}
+
+if cpuid -l ; then
+	set arch=amd64
+	set xarch=amd64
+else
+	set arch=i386
+	#if cpuid -p ; then
+	#	set xarch=i686-pae
+	#else
+		set xarch=i586
+	#fi
+fi
+export arch
+
+function gfxmode {
+	set gfxpayload="${1}"
+}
+set linux_gfx_mode=
+export linux_gfx_mode
+
+EOF
 			print {$h} "function load_theme {\n";
 			if($e->{grub_theme} && -f $e->{prefix}.$e->{grub_theme} && is_path_readable($e->{prefix}.$e->{grub_theme})){
 				print {$h} "\tif ! insmod gfxmenu; then return 1; fi\n";
@@ -577,6 +629,13 @@ EOF
 			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
 			warn __("default unimplemented") if defined $e->{default};
 			warn __("timeout unimplemented") if defined $e->{timeout};
+			print {$h} << 'EOF';
+menu hshift 7
+menu width 61
+
+menu title Debian GNU/Linux installer boot menu
+include debian-installer/boot-screens/stdmenu.cfg
+EOF
 			;#print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
 			;#print {$h} ('	'x$o), 'set timeout=' .$e->{timeout}.  "\n\n" if defined $e->{timeout};
 		},
@@ -745,6 +804,30 @@ EOF
 			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
 			warn __("class unimplemented") if defined $e->{class};
 			warn __("security unimplemented") if defined $e->{users};
+			print {$h} << 'EOF';
+console --picture splash.png || console --picture splash.pgm ||
+set pxe_default_server ${next-server}
+cpuid --ext 29 && set arch amd64 || set arch i386
+cpuid 6 && set pae yes ||
+cpuid --ext 29 && set xarch amd64 || cpuid 6 && set xarch i686-pae || set xarch i586
+cpuid --ecx 5 && set vmx yes ||
+cpuid --ext --ecx 2 && set svm yes ||
+isset ${vmx} || isset ${svm} && set hw_virt yes ||
+set space:hex 20
+set lf:hex 0a
+set esc:hex 1b
+isset ${video} || set video gtk
+isset ${vid} || set vid ${video}
+isset ${debug} || set debug 5
+isset ${preseed} || set preseed http://${pxe_default_server}/debian/preseed.cfg
+isset ${npreseed} || set npreseed http://${pxe_default_server}/debian/preseed.cfg2
+isset ${desktop} || set desktop xfce
+isset ${dpreseed} || set dpreseed url=${preseed}
+isset ${ddesktop} || set ddesktop desktop=${desktop}
+isset ${dvideo} || set dvideo video=vesa:ywrap,mtrr vga=788
+isset ${dmode} || set dmode -- quiet
+
+EOF
 			print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
 			print {$h} ('	'x$o), 'set timeout='.$e->{timeout}."\n\n" if defined $e->{timeout};
 		},
@@ -940,10 +1023,12 @@ EOF
 			print {$h} qq(item --menu $e->{tag} --gap \${space:string}Kernel: \${kernel}\n);
 			print {$h} qq(item --menu $e->{tag} --gap \${space:string}Initrd: \${initrd}\n);
 			print {$h} qq(item --menu $e->{tag} --gap Command: \${command}\n);
+			print {$h} qq(isset \${npreseed} && item --menu $e->{tag} --gap Early Preseed: \${npreseed} || item --menu $e->{tag} --gap No Early Preseed\n);
 			print {$h} qq(item --menu $e->{tag} --gap\n);
 			print {$h} qq(item --menu $e->{tag} --key K	chkr-$e->{tag}	Edit (K)ernel\n);
 			print {$h} qq(item --menu $e->{tag} --key I	chin-$e->{tag}	Edit (I)nitrd\n);
 			print {$h} qq(item --menu $e->{tag} --key C	chco-$e->{tag}	Edit (C)command\n);
+			print {$h} qq(item --menu $e->{tag} --key P	chpr-$e->{tag}	Edit Early (P)reseed\n);
 			print {$h} qq(item --menu $e->{tag} --gap\n);
 			print {$h} qq(item --menu $e->{tag} --default $e->{tag}-boot	Boot\n);
 			print {$h} qq(item --menu $e->{tag} --gap\n);
@@ -954,12 +1039,14 @@ EOF
 			print {$h} q(:chkr-),$e->{tag}, qq(\nread kernel || clear kernel \ngoto $e->{tag}-cont\n);
 			print {$h} q(:chin-),$e->{tag}, qq(\nread initrd || clear initrd \ngoto $e->{tag}-cont\n);
 			print {$h} q(:chco-),$e->{tag}, qq(\nread command || clear command \ngoto $e->{tag}-cont\n);
+			print {$h} q(:chpr-),$e->{tag}, qq(\nread npreseed || clear npreseed \ngoto $e->{tag}-cont\n);
 			print {$h} q(:),$e->{tag}, qq(-boot\necho	Loading kernel ...\n);
 			print {$h} q(kernel	${kernel} ${command} || goto debug-),$e->{tag};
 			print {$h} qq(\necho	Loading initial ramdisk ...\ninitrd	\${initrd});
 ################################################################################
 			#print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
-			print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+			print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed} /preseed.cfg) if defined $e->{flags} and 'npreseed'eq$e->{flags};
+			print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\n:boot-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{tag}\n\n);
 		},
 	},
@@ -1120,8 +1207,8 @@ $i{grub}{basic}=sub{
 	print {$h} ' ',join ' ', map {'--class '.$_} split /,/, $e->{class} if defined $e->{class};
 	print {$h} q( $menuentry_id_option '),$e->{id},q(') if defined $e->{id};
 	print {$h} qq( {\n);
-	print {$h} ('	'x($o+1)),qq(insmod gzio\n);
-	print {$h} ('	'x($o+1)),qq(if [ x\$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi\n);
+	#print {$h} ('	'x($o+1)),qq(insmod gzio\n);
+	#print {$h} ('	'x($o+1)),qq(if [ x\$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi\n);
 	print {$h} map {
 		#s/^(insmod .*)$/if ! $1; then return 1; fi/;
 		('	'x($o+1)),$_
@@ -1173,7 +1260,8 @@ $i{ipxe1}{basic}=sub{
 	}else{
 		warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 	}
-	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title}\n);
+	print {$h} q(isset ${),$e->{condition},q(} && ) if $e->{condition};
+	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title} ||\n);
 };
 $i{ipxe2}{basic}=sub{
 	my $h=shift; #handle
@@ -1199,7 +1287,8 @@ $i{ipxe2}{basic}=sub{
 ################################################################################
 	print {$h} qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$e->{initrd}) if defined $e->{initrd};
 	print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
-	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
+	print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed} /preseed.cfg) if defined $e->{flags} and 'npreseed'eq$e->{flags};
+	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\n:boot-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
 };
 
@@ -1221,10 +1310,10 @@ sub out($\*){
 
 	die __("Unknown format requested") unless defined $i{$t};
 ################################################################################
-	printf {$h} __(qq(#!%s\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by netmenubuilder.\n#\n\n### BEGIN %s: %s ###\n)), $t, $0, $ARGV unless 'pot'eq$t;
-	open my $lib, '<', $t.'.lib' or die;
-	print {$h} $_ while(<$lib>);
-	close $lib;
+	printf {$h} __(qq(#!%s\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by unboot.\n#\n\n### BEGIN %s: %s ###\n)), $t, $0, $ARGV unless 'pot'eq$t;
+	#open my $lib, '<', $t.'.lib' or die;
+	#print {$h} $_ while(<$lib>);
+	#close $lib;
 	$i{$t}{out}($h);
 	printf {$h} __(qq(### END %s: %s ###\n)),$0,$ARGV unless 'pot'eq$t;
 }

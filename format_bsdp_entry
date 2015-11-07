@@ -1,0 +1,56 @@
+#!/usr/bin/perl -pw
+use strict;
+use warnings;
+our ($c,@a);
+BEGIN{
+	print <<"eof";$c++;
+# apple bsdp options
+# ----- ---- -------
+option space bsdp;
+option bsdp.message_type		code 1 = unsigned integer 8;
+option bsdp.bsdp_version		code 2 = unsigned integer 16;
+option bsdp.server_identifier		code 3 = ip-address;
+option bsdp.server_priority		code 4 = unsigned integer 16;
+option bsdp.boot_image_list_path	code 6 = string;
+option bsdp.default_boot_image_id	code 7 = string;
+option bsdp.selected_boot_image_id	code 8 = string;
+option bsdp.boot_image_list		code 9 = string;
+option bsdp.attribute_filter		code 11 = array of {unsigned integer 8, unsigned integer 8};
+option bsdp.machine_name		code 130 = string;
+option bsdp-43 code 43 = encapsulate bsdp;
+
+if substring (option vendor-class-identifier, 0, 9) = "PXEClient" {
+} elsif substring (option vendor-class-identifier, 0, 9) = "AAPLBSDPC" {
+	option bsdp.bsdp_version 0x0101;
+	option bsdp.server_priority 65535;
+	option dhcp-parameter-request-list 1,3,17,43,60;
+	option vendor-class-identifier "AAPLBSDPC";
+	if (option dhcp-message-type = 1) {
+	} elsif (option dhcp-message-type = 8) {
+		if option bsdp.message_type = 1 {
+			option bsdp.message_type 1;			# list
+			option bsdp.boot_image_list
+eof
+}
+s!^(\d+)[ 	]+(\d+)[ 	]+(\d+|auto)[ 	]+(.*)$!
+	my ($a,$b,$d,$e)=($1,$2,('auto'eq$3?$c++:$3),$4);
+	my $f=join q(:), grep({$_} split(/(..)/,unpack(q(H*),pack(q(CxnC/a),($1<<7)+$2,$d,$4)))),"\t\t\t# Name (length ".length($4).") '$4'";
+	$f=~s/^(..:..:..:..):/push @a,$1;"\t\t\t\t$1:\t\t\t\t\t# Image ".($a?"":"non-")."install ID $d\n\t\t\t\t\t"/e;
+	$f!e;
+END{
+	print <<"eof";
+		} elsif option bsdp.message_type = 2 {
+			option bsdp.message_type 2;			# select
+eof
+	print "\t\t	if option bsdp.selected_boot_image_id = ".join(";\n\t\t\t} elsif option bsdp.selected_boot_image_id = ",map {$_." {\n\t\t\t\toption bsdp.selected_boot_image_id ".$_} @a).";\n";
+	print <<"eof"
+			} else {
+				log(info, "bspd_selected_unknown_image");
+			}
+		} else {
+			log(info, "bspd_msgtype_failed");
+		}
+	}
+}
+eof
+}

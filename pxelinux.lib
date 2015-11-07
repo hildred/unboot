@@ -1,5 +1,0 @@
-menu hshift 7
-menu width 61
-
-menu title Debian GNU/Linux installer boot menu
-include debian-installer/boot-screens/stdmenu.cfg

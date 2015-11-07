@@ -131,10 +131,10 @@ function move {
 
 cc=us
 #release=wheezy
-release=testing
-#release=stable
+#release=testing
+release=stable
 version=current
 
-#download "${cc}" "${release}" "${version}"
+download "${cc}" "${release}" "${version}"
 move "${release}" "${version}"
 
