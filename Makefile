@@ -1,7 +1,8 @@
 
-all: debian.set main.set unboot.pot debhd.set debhd2.set
+all: sets unboot.pot
+sets: $(patsubst %.menu,%.set,$(wildcard *.menu))
 extra: grubtemp grub
-.PHONY:
+.PHONY: all sets extra
 .SECONDARY:
 LOCALIZABLE=./buildmenu
 
