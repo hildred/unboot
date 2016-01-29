@@ -17,4 +17,4 @@ sub subst($){
 	return $v{$v} if(defined $v{$v});
 	die "unknown key $v\n";
 }
-s!\${([_a-zA-Z]+)}!subst($1)!ge;
+s!\$\{([_a-zA-Z]+)\}!subst($1)!ge;

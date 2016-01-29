@@ -3,6 +3,7 @@ use strict;
 use warnings;
 our ($c,@a,@b,@c);
 BEGIN{
+	my $ip='192.168.0.1';
 	print <<"eof";$c++;
 #########################
 #			#
@@ -11,6 +12,7 @@ BEGIN{
 #########################
 
 option rfc3442-classless-static-routes	code 121 = array of unsigned integer 8;
+option ms-classless-static-routes code 249 = array of integer 8;
 option test	code 224 = string;
 
 # grub options
@@ -108,30 +110,138 @@ option client-arch code 93 = array of unsigned integer 16;
 #http://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#processor-architecture
 eof
 	{
-		my $fsa="#  %s	%-30s	%s\n";
-		my $fsb="#  %3d	%-30s	%s\n";
+		my $fsp="%-30s	%-16s	%s	%-9s	%s\n";
+		my $fsa='#  %s	'.$fsp;
+		my $fsb='#  %3d	'.$fsp;
 		#my $fsa="#  %s	%s\n";
 		#my $fsb="#  %3d	%s\n";
 		my $fsc="#  %3d	%s\n";
+		my $fsd="#  %s	%-30s	%s\n";
 		local $_;
-		open my $fh, '<', 'processor-architecture.csv';
+		my @vals;
+		my @keys;
+		open my $fh, '<', 'processor-architecture-key.csv';
+		while(<$fh>){
+			chomp;
+			s!$!!;
+			my ($a,@b,@c)=((split /,/),'','','');
+			@b=@b[0..2];
+			if('Type'eq$a){
+				@keys=@b
+			}elsif(! $a=~/^0x.. /){
+				print "#### $a @b\n";
+			}elsif($a=~/^0x([0-9a-f]{2}) 0x([0-9a-f]{2})$/){
+				$a=((hex $1)<<8)+hex $2;
+				$vals[$a]=\@b;
+			}
+		}
+		close $fh;
+		open $fh, '<', 'processor-architecture.csv';
 		while(<$fh>){
 			chomp;
 			s!$!!;
 			my ($a,$b,$c)=split /,/;
-			unless($a=~/^0x00 /){
-				printf $fsa,$a,$b,$c;
+			unless($a=~/^0x.. /){
+				printf $fsa,$a,$b,$c,@keys;
+				@keys=map {s/./-/g;$_} @keys;
 				$a=~s/./-/g;
 				$b=~s/./-/g;
 				$c=~s/./-/g;
-				printf $fsa,$a,$b,$c;
-			}elsif($a=~/^0x00 0x([0-9a-f]{2})$/){
-				$a=hex $1;
+				printf $fsa,$a,$b,$c,@keys;
+			}elsif($a=~/^0x([0-9a-f]{2}) 0x([0-9a-f]{2})$/){
+				$a=((hex $1)<<8)+hex $2;
 				$c=~s/^\[(.*)\]$/$1/;
 				$c=~s/\]\[/, /g;
 				#$c='' unless $c=~/RFC/;
-				printf(($c?$fsb:$fsc),$a,$b,$c);
-				push @c, sprintf "\t} elsif option client-arch = %d { # %d	%s\n\t\tlog(debug, \"2.%d\");\n", $a, $a, $b, $a;
+				printf(($c?$fsb:$fsc),$a,$b,$c,@{$vals[$a]}[0..1],($vals[$a][2]||'tftp'));
+				push @c, sprintf <<'eof', $a, $b, ($vals[$a][0]?'#':'');
+	} elsif option client-arch = encode-int (%1$d,16) { # %1$d	%2$s
+		%3$slog(debug, "2.%1$d");
+eof
+				push @c, <<'eof', if $vals[$a][2];
+		option vendor-class-identifier "HTTPClient";
+eof
+				if($vals[$a][0]){
+					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+		if not exists ipxe.busid {
+			#log(debug, "3.%1$d.old");
+eof
+					unless($vals[$a][2]){
+						push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+			if not exists ipxe.http {
+				log(debug, "4.%1$d.old.tftp");
+				filename "%5$sipxe.%4$s";
+			}elsif not exists dhcp-server-identifier {
+eof
+					}else{
+						push @c, <<'eof';
+			if not exists dhcp-server-identifier {
+eof
+					}
+					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.old.broken");
+				log(debug, "no server identifier");
+				filename "http://%3$s/tftpboot/%5$sipxe.%4$s";
+			}else{
+				log(debug, "4.%1$d.old.http");
+				log(debug, concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s"));
+				filename = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s");
+			}
+		}elsif substring(option ipxe.busid,0,1)=1 {
+			#log(debug, "3.%1$d.pci");
+eof
+					unless($vals[$a][2]){
+						push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+			if not exists ipxe.http {
+				log(debug, "4.%1$d.pci.tftp");
+				log(debug,concat("/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
+				filename= concat("/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
+			}elsif not exists dhcp-server-identifier {
+eof
+					}else{
+						push @c, <<'eof';
+			if not exists dhcp-server-identifier {
+eof
+					}
+					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.pci.broken");
+				log(debug, "no server identifier");
+				log(debug,concat("http://%3$s/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
+				filename= concat("http://%3$s/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
+			}else{
+				log(debug, "4.%1$d.pci.http");
+				log(debug,concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
+				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
+			}
+		}else{
+			#log(debug, "3.%1$d.other");
+eof
+					unless($vals[$a][2]){
+						push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+			if not exists ipxe.http {
+				log(debug, "4.%1$d.other.tftp");
+				log(debug,concat("/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
+				filename= concat("/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
+			}elsif not exists dhcp-server-identifier {
+eof
+					}else{
+						push @c, <<'eof';
+			if not exists dhcp-server-identifier {
+eof
+					}
+					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.other.broken");
+				log(debug, "no server identifier");
+				log(debug,concat("http://%3$s/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
+				filename= concat("http://%3$s/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
+			}else{
+				log(debug, "4.%1$d.other.http");
+				log(debug,concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
+				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
+			}
+		}
+eof
+				}
 			}elsif($a=~/-/){
 			}else{
 				printf $fsa,$a,$b,$c;
@@ -192,7 +302,7 @@ option ipxe.cert		code  91 = string;
 option ipxe.privkey		code  92 = string;
 option ipxe.crosscert		code  93 = string;
 option ipxe.no-pxedhcp		code 176 = unsigned integer 8;
-option ipxe.bus-id		code 177 = string;
+option ipxe.busid		code 177 = string;
 option ipxe.bios-drive		code 189 = unsigned integer 8;
 option ipxe.username		code 190 = string;
 option ipxe.password		code 191 = string;
@@ -286,9 +396,9 @@ log-facility local7;
 # ------- ------ -------
 option domain-name		"example.com";
 option domain-search		"example.com";
-option domain-name-servers	192.168.0.1;
-option ntp-servers		192.168.0.1;
-option time-servers		192.168.0.1;
+option domain-name-servers	$ip;
+option ntp-servers		$ip;
+option time-servers		$ip;
 option log-servers		192.168.0.2;
 option netbios-name-servers	192.168.0.3;
 option netbios-dd-server	192.168.0.3;
@@ -311,279 +421,295 @@ next-server = config-option dhcp-server-identifier;
 # client class specific options
 # ------ ----- -------- -------
 
-if option etherboot.nic-dev-id = 01:0e:11:ae:32 { option etherboot.kmod "netel100"; }
-if option etherboot.nic-dev-id = 01:0e:11:ae:34 { option etherboot.kmod "netel10"; }
-if option etherboot.nic-dev-id = 01:0e:11:ae:35 { option etherboot.kmod "netflex3i"; }
-if option etherboot.nic-dev-id = 01:0e:11:ae:40 { option etherboot.kmod "netel100d"; }
-if option etherboot.nic-dev-id = 01:0e:11:ae:43 { option etherboot.kmod "netel100pi"; }
-if option etherboot.nic-dev-id = 01:0e:11:b0:11 { option etherboot.kmod "netel100i"; }
-if option etherboot.nic-dev-id = 01:0e:11:b0:12 { option etherboot.kmod "netelligent_10_t2"; }
-if option etherboot.nic-dev-id = 01:0e:11:b0:30 { option etherboot.kmod "netelligent_10_100_ws_5100"; }
-if option etherboot.nic-dev-id = 01:0e:11:f1:30 { option etherboot.kmod "thunder"; }
-if option etherboot.nic-dev-id = 01:0e:11:f1:50 { option etherboot.kmod "netflex3b"; }
-if option etherboot.nic-dev-id = 01:10:0b:00:20 { option etherboot.kmod "dp83815"; }
-if option etherboot.nic-dev-id = 01:10:0b:00:22 { option etherboot.kmod "ns83820"; }
-if option etherboot.nic-dev-id = 01:10:11:00:02 { option etherboot.kmod "dc21040"; }
-if option etherboot.nic-dev-id = 01:10:11:00:09 { option etherboot.kmod "ds21140"; }
-if option etherboot.nic-dev-id = 01:10:11:00:14 { option etherboot.kmod "dc21041"; }
-if option etherboot.nic-dev-id = 01:10:11:00:19 { option etherboot.kmod "ds21142"; }
-if option etherboot.nic-dev-id = 01:10:22:20:00 { option etherboot.kmod "pcnet32"; }
-if option etherboot.nic-dev-id = 01:10:22:20:01 { option etherboot.kmod "amdhomepna"; }
-if option etherboot.nic-dev-id = 01:10:22:26:25 { option etherboot.kmod "pcnetfastiii"; }
-if option etherboot.nic-dev-id = 01:10:22:74:62 { option etherboot.kmod "amd8111e"; }
-if option etherboot.nic-dev-id = 01:10:39:09:00 { option etherboot.kmod "sis900"; }
-if option etherboot.nic-dev-id = 01:10:39:70:16 { option etherboot.kmod "sis7016"; }
-if option etherboot.nic-dev-id = 01:10:4a:09:81 { option etherboot.kmod "tulip-0981"; }
-if option etherboot.nic-dev-id = 01:10:4a:27:74 { option etherboot.kmod "SGThomson-STE10100A"; }
-if option etherboot.nic-dev-id = 01:10:50:08:40 { option etherboot.kmod "winbond840"; }
-if option etherboot.nic-dev-id = 01:10:50:09:40 { option etherboot.kmod "winbond940"; }
-if option etherboot.nic-dev-id = 01:10:50:5a:5a { option etherboot.kmod "winbond940f"; }
-if option etherboot.nic-dev-id = 01:10:8d:00:12 { option etherboot.kmod "oc2325"; }
-if option etherboot.nic-dev-id = 01:10:8d:00:13 { option etherboot.kmod "oc2183"; }
-if option etherboot.nic-dev-id = 01:10:8d:00:14 { option etherboot.kmod "oc2326"; }
-if option etherboot.nic-dev-id = 01:10:b7:12:01 { option etherboot.kmod "3c982a"; }
-if option etherboot.nic-dev-id = 01:10:b7:12:02 { option etherboot.kmod "3c982b"; }
-if option etherboot.nic-dev-id = 01:10:b7:45:00 { option etherboot.kmod "3c450"; }
-if option etherboot.nic-dev-id = 01:10:b7:45:00 { option etherboot.kmod "3c450-1"; }
-if option etherboot.nic-dev-id = 01:10:b7:59:00 { option etherboot.kmod "3c590"; }
-if option etherboot.nic-dev-id = 01:10:b7:59:50 { option etherboot.kmod "3c595"; }
-if option etherboot.nic-dev-id = 01:10:b7:59:51 { option etherboot.kmod "3c595-1"; }
-if option etherboot.nic-dev-id = 01:10:b7:59:52 { option etherboot.kmod "3c595-2"; }
-if option etherboot.nic-dev-id = 01:10:b7:60:55 { option etherboot.kmod "3c556"; }
-if option etherboot.nic-dev-id = 01:10:b7:76:46 { option etherboot.kmod "3csoho100-tx"; }
-if option etherboot.nic-dev-id = 01:10:b7:76:46 { option etherboot.kmod "3csoho100-tx-1"; }
-if option etherboot.nic-dev-id = 01:10:b7:77:70 { option etherboot.kmod "3c-airconnect"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:00 { option etherboot.kmod "3c900-tpo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:00 { option etherboot.kmod "3c905-tpo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:01 { option etherboot.kmod "3c900-t4"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:01 { option etherboot.kmod "3c905-t4"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:04 { option etherboot.kmod "3c900b-tpo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:04 { option etherboot.kmod "3c905b-tpo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:05 { option etherboot.kmod "3c900b-combo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:05 { option etherboot.kmod "3c905b-combo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:06 { option etherboot.kmod "3c900b-tpb2"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:06 { option etherboot.kmod "3c905b-tpb2"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:0a { option etherboot.kmod "3c900b-fl"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:0a { option etherboot.kmod "3c905b-fl"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:50 { option etherboot.kmod "3c905-tpo100"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:51 { option etherboot.kmod "3c905-combo"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:55 { option etherboot.kmod "3c905b-tpo100"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:56 { option etherboot.kmod "3c905b-t4"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:58 { option etherboot.kmod "3c905b-9058"; }
-if option etherboot.nic-dev-id = 01:10:b7:90:5a { option etherboot.kmod "3c905b-fx"; }
-if option etherboot.nic-dev-id = 01:10:b7:92:00 { option etherboot.kmod "3c905c-tpo"; }
-if option etherboot.nic-dev-id = 01:10:b7:92:02 { option etherboot.kmod "3c920b-emb-ati"; }
-if option etherboot.nic-dev-id = 01:10:b7:92:10 { option etherboot.kmod "3c920b-emb-wnm"; }
-if option etherboot.nic-dev-id = 01:10:b7:93:00 { option etherboot.kmod "3csoho100b-tx"; }
-if option etherboot.nic-dev-id = 01:10:b7:98:00 { option etherboot.kmod "3c980"; }
-if option etherboot.nic-dev-id = 01:10:b7:98:00 { option etherboot.kmod "3c980-cyclone-1"; }
-if option etherboot.nic-dev-id = 01:10:b7:98:05 { option etherboot.kmod "3c9805"; }
-if option etherboot.nic-dev-id = 01:10:b7:98:05 { option etherboot.kmod "3c9805-1"; }
-if option etherboot.nic-dev-id = 01:10:b8:00:05 { option etherboot.kmod "epic100"; }
-if option etherboot.nic-dev-id = 01:10:b8:00:06 { option etherboot.kmod "smc-83c175"; }
-if option etherboot.nic-dev-id = 01:10:b9:52:61 { option etherboot.kmod "ali1563"; }
-if option etherboot.nic-dev-id = 01:10:bd:0e:34 { option etherboot.kmod "surecom-ne34"; }
-if option etherboot.nic-dev-id = 01:10:d9:05:12 { option etherboot.kmod "mx98713"; }
-if option etherboot.nic-dev-id = 01:10:d9:05:31 { option etherboot.kmod "mx98715"; }
-if option etherboot.nic-dev-id = 01:10:de:00:37 { option etherboot.kmod "nforce10"; }
-if option etherboot.nic-dev-id = 01:10:de:00:38 { option etherboot.kmod "nforce11"; }
-if option etherboot.nic-dev-id = 01:10:de:00:56 { option etherboot.kmod "nforce8"; }
-if option etherboot.nic-dev-id = 01:10:de:00:57 { option etherboot.kmod "nforce9"; }
-if option etherboot.nic-dev-id = 01:10:de:00:66 { option etherboot.kmod "nforce2"; }
-if option etherboot.nic-dev-id = 01:10:de:00:86 { option etherboot.kmod "nforce4"; }
-if option etherboot.nic-dev-id = 01:10:de:00:8c { option etherboot.kmod "nforce5"; }
-if option etherboot.nic-dev-id = 01:10:de:00:d6 { option etherboot.kmod "nforce3"; }
-if option etherboot.nic-dev-id = 01:10:de:00:df { option etherboot.kmod "nforce7"; }
-if option etherboot.nic-dev-id = 01:10:de:00:e6 { option etherboot.kmod "nforce6"; }
-if option etherboot.nic-dev-id = 01:10:de:01:c3 { option etherboot.kmod "nforce"; }
-if option etherboot.nic-dev-id = 01:10:de:02:68 { option etherboot.kmod "nforce12"; }
-if option etherboot.nic-dev-id = 01:10:de:02:69 { option etherboot.kmod "nforce13"; }
-if option etherboot.nic-dev-id = 01:10:de:03:72 { option etherboot.kmod "nforce14"; }
-if option etherboot.nic-dev-id = 01:10:de:03:73 { option etherboot.kmod "nforce15"; }
-if option etherboot.nic-dev-id = 01:10:ec:80:29 { option etherboot.kmod "rtl8029"; }
-if option etherboot.nic-dev-id = 01:10:ec:81:29 { option etherboot.kmod "rtl8129"; }
-if option etherboot.nic-dev-id = 01:10:ec:81:38 { option etherboot.kmod "rtl8139b"; }
-if option etherboot.nic-dev-id = 01:10:ec:81:39 { option etherboot.kmod "rtl8139"; }
-if option etherboot.nic-dev-id = 01:10:ec:81:69 { option etherboot.kmod "r8169"; }
-if option etherboot.nic-dev-id = 01:11:06:09:26 { option etherboot.kmod "via86c926"; }
-if option etherboot.nic-dev-id = 01:11:06:30:43 { option etherboot.kmod "dlink-530tx-old"; }
-if option etherboot.nic-dev-id = 01:11:06:30:53 { option etherboot.kmod "via6105m"; }
-if option etherboot.nic-dev-id = 01:11:06:30:65 { option etherboot.kmod "dlink-530tx"; }
-if option etherboot.nic-dev-id = 01:11:06:31:06 { option etherboot.kmod "via-rhine-6105"; }
-if option etherboot.nic-dev-id = 01:11:06:31:19 { option etherboot.kmod "via-velocity"; }
-if option etherboot.nic-dev-id = 01:11:06:61:00 { option etherboot.kmod "via-rhine-old"; }
-if option etherboot.nic-dev-id = 01:11:12:12:11 { option etherboot.kmod "smc1211"; }
-if option etherboot.nic-dev-id = 01:11:13:12:11 { option etherboot.kmod "smc1211-1"; }
-if option etherboot.nic-dev-id = 01:11:13:12:16 { option etherboot.kmod "an983"; }
-if option etherboot.nic-dev-id = 01:11:13:12:17 { option etherboot.kmod "mxic-98715"; }
-if option etherboot.nic-dev-id = 01:11:13:95:11 { option etherboot.kmod "tulip-9511"; }
-if option etherboot.nic-dev-id = 01:11:1a:10:23 { option etherboot.kmod "ss1023"; }
-if option etherboot.nic-dev-id = 01:11:48:44:00 { option etherboot.kmod "tg3-9DXX"; }
-if option etherboot.nic-dev-id = 01:11:48:45:00 { option etherboot.kmod "tg3-9MXX"; }
-if option etherboot.nic-dev-id = 01:11:5d:00:03 { option etherboot.kmod "xircomtulip"; }
-if option etherboot.nic-dev-id = 01:11:86:03:00 { option etherboot.kmod "dlink-528"; }
-if option etherboot.nic-dev-id = 01:11:86:10:02 { option etherboot.kmod "dfe530txs"; }
-if option etherboot.nic-dev-id = 01:11:86:13:00 { option etherboot.kmod "dfe538"; }
-if option etherboot.nic-dev-id = 01:11:86:13:40 { option etherboot.kmod "dfe690txd"; }
-if option etherboot.nic-dev-id = 01:11:86:15:61 { option etherboot.kmod "tulip-1561"; }
-if option etherboot.nic-dev-id = 01:11:86:43:00 { option etherboot.kmod "dlink-r8169"; }
-if option etherboot.nic-dev-id = 01:11:ad:00:02 { option etherboot.kmod "82c168"; }
-if option etherboot.nic-dev-id = 01:11:ad:c1:15 { option etherboot.kmod "lc82c115"; }
-if option etherboot.nic-dev-id = 01:11:f6:14:01 { option etherboot.kmod "compexrl2000"; }
-if option etherboot.nic-dev-id = 01:11:f6:20:11 { option etherboot.kmod "compexrl100atx"; }
-if option etherboot.nic-dev-id = 01:11:f6:98:81 { option etherboot.kmod "rl100tx"; }
-if option etherboot.nic-dev-id = 01:12:59:a1:17 { option etherboot.kmod "allied8139"; }
-if option etherboot.nic-dev-id = 01:12:59:a1:20 { option etherboot.kmod "tulip-a120"; }
-if option etherboot.nic-dev-id = 01:12:5b:14:00 { option etherboot.kmod "ax88140"; }
-if option etherboot.nic-dev-id = 01:12:60:38:73 { option etherboot.kmod "dwl520"; }
-if option etherboot.nic-dev-id = 01:12:60:38:73 { option etherboot.kmod "hwp01170"; }
-if option etherboot.nic-dev-id = 01:12:60:38:73 { option etherboot.kmod "prism2_pci"; }
-if option etherboot.nic-dev-id = 01:12:6c:80:30 { option etherboot.kmod "emobility"; }
-if option etherboot.nic-dev-id = 01:12:82:90:09 { option etherboot.kmod "davicom9009"; }
-if option etherboot.nic-dev-id = 01:12:82:90:09 { option etherboot.kmod "dm9009"; }
-if option etherboot.nic-dev-id = 01:12:82:90:09 { option etherboot.kmod "dmfe9009"; }
-if option etherboot.nic-dev-id = 01:12:82:91:00 { option etherboot.kmod "davicom9100"; }
-if option etherboot.nic-dev-id = 01:12:82:91:00 { option etherboot.kmod "dm9100"; }
-if option etherboot.nic-dev-id = 01:12:82:91:00 { option etherboot.kmod "dmfe9100"; }
-if option etherboot.nic-dev-id = 01:12:82:91:02 { option etherboot.kmod "davicom9102"; }
-if option etherboot.nic-dev-id = 01:12:82:91:02 { option etherboot.kmod "dm9102"; }
-if option etherboot.nic-dev-id = 01:12:82:91:02 { option etherboot.kmod "dmfe9102"; }
-if option etherboot.nic-dev-id = 01:12:82:91:32 { option etherboot.kmod "davicom9132"; }
-if option etherboot.nic-dev-id = 01:12:82:91:32 { option etherboot.kmod "dm9132"; }
-if option etherboot.nic-dev-id = 01:12:82:91:32 { option etherboot.kmod "dmfe9132"; }
-if option etherboot.nic-dev-id = 01:12:c3:00:58 { option etherboot.kmod "holtek80232"; }
-if option etherboot.nic-dev-id = 01:12:c3:55:98 { option etherboot.kmod "holtek80229"; }
-if option etherboot.nic-dev-id = 01:13:17:09:81 { option etherboot.kmod "an981"; }
-if option etherboot.nic-dev-id = 01:13:17:09:85 { option etherboot.kmod "centaur-p"; }
-if option etherboot.nic-dev-id = 01:13:17:19:85 { option etherboot.kmod "centaur-c"; }
-if option etherboot.nic-dev-id = 01:13:17:95:11 { option etherboot.kmod "an983b"; }
-if option etherboot.nic-dev-id = 01:13:85:41:00 { option etherboot.kmod "ma301"; }
-if option etherboot.nic-dev-id = 01:13:d1:ab:02 { option etherboot.kmod "tulip-ab02"; }
-if option etherboot.nic-dev-id = 01:13:d1:ab:03 { option etherboot.kmod "tulip-ab03"; }
-if option etherboot.nic-dev-id = 01:13:d1:ab:06 { option etherboot.kmod "fe2000vx"; }
-if option etherboot.nic-dev-id = 01:13:d1:ab:08 { option etherboot.kmod "tulip-ab08"; }
-if option etherboot.nic-dev-id = 01:13:f0:02:01 { option etherboot.kmod "sundance"; }
-if option etherboot.nic-dev-id = 01:14:c1:00:08 { option etherboot.kmod "LANai-Z8E"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:44 { option etherboot.kmod "tg3-5700"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:45 { option etherboot.kmod "tg3-5701"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:46 { option etherboot.kmod "tg3-5702"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:47 { option etherboot.kmod "tg3-5703"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:48 { option etherboot.kmod "tg3-5704"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:4a { option etherboot.kmod "bnx2-5706"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:4c { option etherboot.kmod "bnx2-5708"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:4d { option etherboot.kmod "tg3-5702FE"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:53 { option etherboot.kmod "tg3-5705"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:54 { option etherboot.kmod "tg3-5705_2"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:59 { option etherboot.kmod "tg3-5721"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:5d { option etherboot.kmod "tg3-5705M"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:5e { option etherboot.kmod "tg3-5705M_2"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:77 { option etherboot.kmod "tg3-5751"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:96 { option etherboot.kmod "tg3-5782"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:9c { option etherboot.kmod "tg3-5788"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:a6 { option etherboot.kmod "tg3-5702X"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:a7 { option etherboot.kmod "tg3-5703X"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:a8 { option etherboot.kmod "tg3-5704S"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:aa { option etherboot.kmod "bnx2-5706S"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:ac { option etherboot.kmod "bnx2-5708S"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:c6 { option etherboot.kmod "tg3-5702A3"; }
-if option etherboot.nic-dev-id = 01:14:e4:16:c7 { option etherboot.kmod "tg3-5703A3"; }
-if option etherboot.nic-dev-id = 01:14:e4:17:0d { option etherboot.kmod "tg3-5901"; }
-if option etherboot.nic-dev-id = 01:14:e4:17:0e { option etherboot.kmod "tg3-5901_2"; }
-if option etherboot.nic-dev-id = 01:14:ea:ab:06 { option etherboot.kmod "fnw3603tx"; }
-if option etherboot.nic-dev-id = 01:14:ea:ab:07 { option etherboot.kmod "fnw3800tx"; }
-if option etherboot.nic-dev-id = 01:14:f1:18:03 { option etherboot.kmod "lanfinity"; }
-if option etherboot.nic-dev-id = 01:15:00:13:60 { option etherboot.kmod "delta8139"; }
-if option etherboot.nic-dev-id = 01:15:16:08:00 { option etherboot.kmod "MTD800"; }
-if option etherboot.nic-dev-id = 01:15:16:08:03 { option etherboot.kmod "MTD803"; }
-if option etherboot.nic-dev-id = 01:15:16:08:91 { option etherboot.kmod "MTD891"; }
-if option etherboot.nic-dev-id = 01:15:b3:5a:44 { option etherboot.kmod "MT23108"; }
-if option etherboot.nic-dev-id = 01:15:b3:62:74 { option etherboot.kmod "MT25204"; }
-if option etherboot.nic-dev-id = 01:15:b3:62:78 { option etherboot.kmod "MT25208"; }
-if option etherboot.nic-dev-id = 01:15:b3:62:82 { option etherboot.kmod "MT25218"; }
-if option etherboot.nic-dev-id = 01:15:e8:01:30 { option etherboot.kmod "correga"; }
-if option etherboot.nic-dev-id = 01:16:26:84:10 { option etherboot.kmod "tulip-8410"; }
-if option etherboot.nic-dev-id = 01:16:38:11:00 { option etherboot.kmod "smc2602w"; }
-if option etherboot.nic-dev-id = 01:16:ab:11:00 { option etherboot.kmod "gl24110p"; }
-if option etherboot.nic-dev-id = 01:16:ab:11:01 { option etherboot.kmod "16ab-1101"; }
-if option etherboot.nic-dev-id = 01:16:ab:11:02 { option etherboot.kmod "wdt11"; }
-if option etherboot.nic-dev-id = 01:16:ec:01:16 { option etherboot.kmod "usr-r8169"; }
-if option etherboot.nic-dev-id = 01:16:ec:36:85 { option etherboot.kmod "usr2415"; }
-if option etherboot.nic-dev-id = 01:17:37:ab:08 { option etherboot.kmod "tulip-1737-ab08"; }
-if option etherboot.nic-dev-id = 01:17:37:ab:09 { option etherboot.kmod "tulip-ab09"; }
-if option etherboot.nic-dev-id = 01:17:3b:03:e8 { option etherboot.kmod "tg3-ac1000"; }
-if option etherboot.nic-dev-id = 01:17:3b:03:e9 { option etherboot.kmod "tg3-ac1001"; }
-if option etherboot.nic-dev-id = 01:17:3b:03:ea { option etherboot.kmod "tg3-ac9100"; }
-if option etherboot.nic-dev-id = 01:17:3b:03:eb { option etherboot.kmod "tg3-ac1003"; }
-if option etherboot.nic-dev-id = 01:19:24:07:03 { option etherboot.kmod "falcon"; }
-if option etherboot.nic-dev-id = 01:19:24:c1:01 { option etherboot.kmod "ef1002"; }
-if option etherboot.nic-dev-id = 01:40:33:13:60 { option etherboot.kmod "addtron8139"; }
-if option etherboot.nic-dev-id = 01:4a:14:50:00 { option etherboot.kmod "nv5000sc"; }
-if option etherboot.nic-dev-id = 01:80:86:00:39 { option etherboot.kmod "intel21145"; }
-if option etherboot.nic-dev-id = 01:80:86:10:00 { option etherboot.kmod "e1000-82542"; }
-if option etherboot.nic-dev-id = 01:80:86:10:01 { option etherboot.kmod "e1000-82543gc-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:04 { option etherboot.kmod "e1000-82543gc-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:08 { option etherboot.kmod "e1000-82544ei-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:09 { option etherboot.kmod "e1000-82544ei-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:0c { option etherboot.kmod "e1000-82544gc-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:0d { option etherboot.kmod "e1000-82544gc-lom"; }
-if option etherboot.nic-dev-id = 01:80:86:10:0e { option etherboot.kmod "e1000-82540em"; }
-if option etherboot.nic-dev-id = 01:80:86:10:0f { option etherboot.kmod "e1000-82545em-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:10 { option etherboot.kmod "e1000-82546eb-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:11 { option etherboot.kmod "e1000-82545em-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:12 { option etherboot.kmod "e1000-82546eb-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:13 { option etherboot.kmod "e1000-82541ei"; }
-if option etherboot.nic-dev-id = 01:80:86:10:15 { option etherboot.kmod "e1000-82540em-lom"; }
-if option etherboot.nic-dev-id = 01:80:86:10:16 { option etherboot.kmod "e1000-82540ep-lom"; }
-if option etherboot.nic-dev-id = 01:80:86:10:17 { option etherboot.kmod "e1000-82540ep"; }
-if option etherboot.nic-dev-id = 01:80:86:10:18 { option etherboot.kmod "e1000-82541ep"; }
-if option etherboot.nic-dev-id = 01:80:86:10:19 { option etherboot.kmod "e1000-82547ei"; }
-if option etherboot.nic-dev-id = 01:80:86:10:1d { option etherboot.kmod "e1000-82546eb-quad-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:1e { option etherboot.kmod "e1000-82540ep-lp"; }
-if option etherboot.nic-dev-id = 01:80:86:10:26 { option etherboot.kmod "e1000-82545gm-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:27 { option etherboot.kmod "e1000-82545gm-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:28 { option etherboot.kmod "e1000-82545gm-serdes"; }
-if option etherboot.nic-dev-id = 01:80:86:10:29 { option etherboot.kmod "id1029"; }
-if option etherboot.nic-dev-id = 01:80:86:10:30 { option etherboot.kmod "id1030"; }
-if option etherboot.nic-dev-id = 01:80:86:10:31 { option etherboot.kmod "82801cam"; }
-if option etherboot.nic-dev-id = 01:80:86:10:32 { option etherboot.kmod "eepro100-1032"; }
-if option etherboot.nic-dev-id = 01:80:86:10:33 { option etherboot.kmod "eepro100-1033"; }
-if option etherboot.nic-dev-id = 01:80:86:10:34 { option etherboot.kmod "eepro100-1034"; }
-if option etherboot.nic-dev-id = 01:80:86:10:35 { option etherboot.kmod "eepro100-1035"; }
-if option etherboot.nic-dev-id = 01:80:86:10:36 { option etherboot.kmod "eepro100-1036"; }
-if option etherboot.nic-dev-id = 01:80:86:10:37 { option etherboot.kmod "eepro100-1037"; }
-if option etherboot.nic-dev-id = 01:80:86:10:38 { option etherboot.kmod "id1038"; }
-if option etherboot.nic-dev-id = 01:80:86:10:39 { option etherboot.kmod "82562et"; }
-if option etherboot.nic-dev-id = 01:80:86:10:3a { option etherboot.kmod "id103a"; }
-if option etherboot.nic-dev-id = 01:80:86:10:3b { option etherboot.kmod "82562etb"; }
-if option etherboot.nic-dev-id = 01:80:86:10:3c { option etherboot.kmod "eepro100-103c"; }
-if option etherboot.nic-dev-id = 01:80:86:10:3d { option etherboot.kmod "eepro100-103d"; }
-if option etherboot.nic-dev-id = 01:80:86:10:3e { option etherboot.kmod "eepro100-103e"; }
-if option etherboot.nic-dev-id = 01:80:86:10:50 { option etherboot.kmod "82562ez"; }
-if option etherboot.nic-dev-id = 01:80:86:10:51 { option etherboot.kmod "eepro100-1051"; }
-if option etherboot.nic-dev-id = 01:80:86:10:51 { option etherboot.kmod "prove"; }
-if option etherboot.nic-dev-id = 01:80:86:10:59 { option etherboot.kmod "82551qm"; }
-if option etherboot.nic-dev-id = 01:80:86:10:75 { option etherboot.kmod "e1000-82547gi"; }
-if option etherboot.nic-dev-id = 01:80:86:10:76 { option etherboot.kmod "e1000-82541gi"; }
-if option etherboot.nic-dev-id = 01:80:86:10:77 { option etherboot.kmod "e1000-82541gi-mobile"; }
-if option etherboot.nic-dev-id = 01:80:86:10:78 { option etherboot.kmod "e1000-82541er"; }
-if option etherboot.nic-dev-id = 01:80:86:10:79 { option etherboot.kmod "e1000-82546gb-copper"; }
-if option etherboot.nic-dev-id = 01:80:86:10:7a { option etherboot.kmod "e1000-82546gb-fiber"; }
-if option etherboot.nic-dev-id = 01:80:86:10:7b { option etherboot.kmod "e1000-82546gb-serdes"; }
-if option etherboot.nic-dev-id = 01:80:86:10:7c { option etherboot.kmod "e1000-82541pi"; }
-if option etherboot.nic-dev-id = 01:80:86:10:96 { option etherboot.kmod "e1000_80003es2lan"; }
-if option etherboot.nic-dev-id = 01:80:86:12:09 { option etherboot.kmod "82559er"; }
-if option etherboot.nic-dev-id = 01:80:86:12:27 { option etherboot.kmod "82865"; }
-if option etherboot.nic-dev-id = 01:80:86:12:28 { option etherboot.kmod "82556"; }
-if option etherboot.nic-dev-id = 01:80:86:12:29 { option etherboot.kmod "eepro100"; }
-if option etherboot.nic-dev-id = 01:80:86:24:49 { option etherboot.kmod "82562em"; }
-if option etherboot.nic-dev-id = 01:80:86:24:59 { option etherboot.kmod "82562-1"; }
-if option etherboot.nic-dev-id = 01:80:86:24:5d { option etherboot.kmod "82562-2"; }
-if option etherboot.nic-dev-id = 01:80:86:52:00 { option etherboot.kmod "eepro100-5200"; }
-if option etherboot.nic-dev-id = 01:80:86:52:01 { option etherboot.kmod "eepro100-5201"; }
-if option etherboot.nic-dev-id = 01:8e:2e:30:00 { option etherboot.kmod "ktiet32p2"; }
-if option etherboot.nic-dev-id = 01:ec:80:ec:00 { option etherboot.kmod "f5d6000"; }
-if option etherboot.nic-dev-id = 01:fe:fe:ef:ef { option etherboot.kmod "pnic"; }
-if option etherboot.nic-dev-id = 01:ff:ff:81:39 { option etherboot.kmod "clone-rtl8139"; }
+set hwid = pick-first-value (
+	option etherboot.nic-dev-id,
+	option ipxe.busid,
+	00:00
+);
+
+if hwid=00:00 {set kmod = "no pci id reported";}
+elsif hwid=01:00:01:81:68 {set kmod = "rtl8169-0x0001-0x8168";}
+elsif hwid=01:0e:11:ae:32 {set kmod = "netel100";}
+elsif hwid=01:0e:11:ae:34 {set kmod = "netel10";}
+elsif hwid=01:0e:11:ae:35 {set kmod = "netflex3i";}
+elsif hwid=01:0e:11:ae:40 {set kmod = "netel100d";}
+elsif hwid=01:0e:11:ae:43 {set kmod = "netel100pi";}
+elsif hwid=01:0e:11:b0:11 {set kmod = "netel100i";}
+elsif hwid=01:0e:11:b0:12 {set kmod = "netelligent_10_t2";}
+elsif hwid=01:0e:11:b0:30 {set kmod = "netelligent_10_100_ws_5100";}
+elsif hwid=01:0e:11:f1:30 {set kmod = "thunder";}
+elsif hwid=01:0e:11:f1:50 {set kmod = "netflex3b";}
+elsif hwid=01:10:0b:00:20 {set kmod = "dp83815";}
+elsif hwid=01:10:0b:00:22 {set kmod = "ns83820";}
+elsif hwid=01:10:11:00:02 {set kmod = "dc21040";}
+elsif hwid=01:10:11:00:09 {set kmod = "ds21140";}
+elsif hwid=01:10:11:00:14 {set kmod = "dc21041";}
+elsif hwid=01:10:11:00:19 {set kmod = "ds21142";}
+elsif hwid=01:10:22:20:00 {set kmod = "pcnet32";}
+elsif hwid=01:10:22:20:01 {set kmod = "amdhomepna";}
+elsif hwid=01:10:22:26:25 {set kmod = "pcnetfastiii";}
+elsif hwid=01:10:22:74:62 {set kmod = "amd8111e";}
+elsif hwid=01:10:39:09:00 {set kmod = "sis900";}
+elsif hwid=01:10:39:70:16 {set kmod = "sis7016";}
+elsif hwid=01:10:4a:09:81 {set kmod = "tulip-0981";}
+elsif hwid=01:10:4a:27:74 {set kmod = "SGThomson-STE10100A";}
+elsif hwid=01:10:50:08:40 {set kmod = "winbond840";}
+elsif hwid=01:10:50:09:40 {set kmod = "winbond940";}
+elsif hwid=01:10:50:5a:5a {set kmod = "winbond940f";}
+elsif hwid=01:10:8d:00:12 {set kmod = "oc2325";}
+elsif hwid=01:10:8d:00:13 {set kmod = "oc2183";}
+elsif hwid=01:10:8d:00:14 {set kmod = "oc2326";}
+elsif hwid=01:10:b7:12:01 {set kmod = "3c982a";}
+elsif hwid=01:10:b7:12:02 {set kmod = "3c982b";}
+elsif hwid=01:10:b7:45:00 {set kmod = "3c450";}
+elsif hwid=01:10:b7:45:00 {set kmod = "3c450-1";}
+elsif hwid=01:10:b7:59:00 {set kmod = "3c590";}
+elsif hwid=01:10:b7:59:50 {set kmod = "3c595";}
+elsif hwid=01:10:b7:59:51 {set kmod = "3c595-1";}
+elsif hwid=01:10:b7:59:52 {set kmod = "3c595-2";}
+elsif hwid=01:10:b7:60:55 {set kmod = "3c556";}
+elsif hwid=01:10:b7:76:46 {set kmod = "3csoho100-tx";}
+elsif hwid=01:10:b7:76:46 {set kmod = "3csoho100-tx-1";}
+elsif hwid=01:10:b7:77:70 {set kmod = "3c-airconnect";}
+elsif hwid=01:10:b7:90:00 {set kmod = "3c900-tpo";}
+elsif hwid=01:10:b7:90:00 {set kmod = "3c905-tpo";}
+elsif hwid=01:10:b7:90:01 {set kmod = "3c900-t4";}
+elsif hwid=01:10:b7:90:01 {set kmod = "3c905-t4";}
+elsif hwid=01:10:b7:90:04 {set kmod = "3c900b-tpo";}
+elsif hwid=01:10:b7:90:04 {set kmod = "3c905b-tpo";}
+elsif hwid=01:10:b7:90:05 {set kmod = "3c900b-combo";}
+elsif hwid=01:10:b7:90:05 {set kmod = "3c905b-combo";}
+elsif hwid=01:10:b7:90:06 {set kmod = "3c900b-tpb2";}
+elsif hwid=01:10:b7:90:06 {set kmod = "3c905b-tpb2";}
+elsif hwid=01:10:b7:90:0a {set kmod = "3c900b-fl";}
+elsif hwid=01:10:b7:90:0a {set kmod = "3c905b-fl";}
+elsif hwid=01:10:b7:90:50 {set kmod = "3c905-tpo100";}
+elsif hwid=01:10:b7:90:51 {set kmod = "3c905-combo";}
+elsif hwid=01:10:b7:90:55 {set kmod = "3c905b-tpo100";}
+elsif hwid=01:10:b7:90:56 {set kmod = "3c905b-t4";}
+elsif hwid=01:10:b7:90:58 {set kmod = "3c905b-9058";}
+elsif hwid=01:10:b7:90:5a {set kmod = "3c905b-fx";}
+elsif hwid=01:10:b7:92:00 {set kmod = "3c905c-tpo";}
+elsif hwid=01:10:b7:92:02 {set kmod = "3c920b-emb-ati";}
+elsif hwid=01:10:b7:92:10 {set kmod = "3c920b-emb-wnm";}
+elsif hwid=01:10:b7:93:00 {set kmod = "3csoho100b-tx";}
+elsif hwid=01:10:b7:98:00 {set kmod = "3c980";}
+elsif hwid=01:10:b7:98:00 {set kmod = "3c980-cyclone-1";}
+elsif hwid=01:10:b7:98:05 {set kmod = "3c9805";}
+elsif hwid=01:10:b7:98:05 {set kmod = "3c9805-1";}
+elsif hwid=01:10:b8:00:05 {set kmod = "epic100";}
+elsif hwid=01:10:b8:00:06 {set kmod = "smc-83c175";}
+elsif hwid=01:10:b9:52:61 {set kmod = "ali1563";}
+elsif hwid=01:10:bd:0e:34 {set kmod = "surecom-ne34";}
+elsif hwid=01:10:d9:05:12 {set kmod = "mx98713";}
+elsif hwid=01:10:d9:05:31 {set kmod = "mx98715";}
+elsif hwid=01:10:de:00:37 {set kmod = "nforce10";}
+elsif hwid=01:10:de:00:38 {set kmod = "nforce11";}
+elsif hwid=01:10:de:00:56 {set kmod = "nforce8";}
+elsif hwid=01:10:de:00:57 {set kmod = "nforce9";}
+elsif hwid=01:10:de:00:66 {set kmod = "nforce2";}
+elsif hwid=01:10:de:00:86 {set kmod = "nforce4";}
+elsif hwid=01:10:de:00:8c {set kmod = "nforce5";}
+elsif hwid=01:10:de:00:d6 {set kmod = "nforce3";}
+elsif hwid=01:10:de:00:df {set kmod = "nforce7";}
+elsif hwid=01:10:de:00:e6 {set kmod = "nforce6";}
+elsif hwid=01:10:de:01:c3 {set kmod = "nforce";}
+elsif hwid=01:10:de:02:68 {set kmod = "nforce12";}
+elsif hwid=01:10:de:02:69 {set kmod = "nforce13";}
+elsif hwid=01:10:de:03:72 {set kmod = "nforce14";}
+elsif hwid=01:10:de:03:73 {set kmod = "nforce15";}
+elsif hwid=01:10:ec:80:29 {set kmod = "rtl8029";}
+elsif hwid=01:10:ec:81:29 {set kmod = "rtl8129";}
+elsif hwid=01:10:ec:81:29 {set kmod = "rtl8169-0x8129";}
+elsif hwid=01:10:ec:81:36 {set kmod = "rtl8169-0x8136";}
+elsif hwid=01:10:ec:81:38 {set kmod = "rtl8139b";}
+elsif hwid=01:10:ec:81:39 {set kmod = "rtl8139";}
+elsif hwid=01:10:ec:81:67 {set kmod = "rtl8169-0x8167";}
+elsif hwid=01:10:ec:81:68 {set kmod = "rtl8169-0x8168";}
+elsif hwid=01:10:ec:81:69 {set kmod = "rtl8169-0x8169";}
+elsif hwid=01:11:06:09:26 {set kmod = "via86c926";}
+elsif hwid=01:11:06:30:43 {set kmod = "dlink-530tx-old";}
+elsif hwid=01:11:06:30:53 {set kmod = "via6105m";}
+elsif hwid=01:11:06:30:65 {set kmod = "dlink-530tx";}
+elsif hwid=01:11:06:31:06 {set kmod = "via-rhine-6105";}
+elsif hwid=01:11:06:31:19 {set kmod = "via-velocity";}
+elsif hwid=01:11:06:61:00 {set kmod = "via-rhine-old";}
+elsif hwid=01:11:12:12:11 {set kmod = "smc1211";}
+elsif hwid=01:11:13:12:11 {set kmod = "smc1211-1";}
+elsif hwid=01:11:13:12:16 {set kmod = "an983";}
+elsif hwid=01:11:13:12:17 {set kmod = "mxic-98715";}
+elsif hwid=01:11:13:95:11 {set kmod = "tulip-9511";}
+elsif hwid=01:11:1a:10:23 {set kmod = "ss1023";}
+elsif hwid=01:11:48:44:00 {set kmod = "tg3-9DXX";}
+elsif hwid=01:11:48:45:00 {set kmod = "tg3-9MXX";}
+elsif hwid=01:11:5d:00:03 {set kmod = "xircomtulip";}
+elsif hwid=01:11:86:03:00 {set kmod = "dlink-528";}
+elsif hwid=01:11:86:10:02 {set kmod = "dfe530txs";}
+elsif hwid=01:11:86:13:00 {set kmod = "dfe538";}
+elsif hwid=01:11:86:13:40 {set kmod = "dfe690txd";}
+elsif hwid=01:11:86:15:61 {set kmod = "tulip-1561";}
+elsif hwid=01:11:86:43:00 {set kmod = "rtl8169-0x4300";}
+elsif hwid=01:11:ad:00:02 {set kmod = "82c168";}
+elsif hwid=01:11:ad:c1:15 {set kmod = "lc82c115";}
+elsif hwid=01:11:f6:14:01 {set kmod = "compexrl2000";}
+elsif hwid=01:11:f6:20:11 {set kmod = "compexrl100atx";}
+elsif hwid=01:11:f6:98:81 {set kmod = "rl100tx";}
+elsif hwid=01:12:59:a1:17 {set kmod = "allied8139";}
+elsif hwid=01:12:59:a1:20 {set kmod = "tulip-a120";}
+elsif hwid=01:12:59:c1:07 {set kmod = "rtl8169-0xc107";}
+elsif hwid=01:12:5b:14:00 {set kmod = "ax88140";}
+elsif hwid=01:12:60:38:73 {set kmod = "dwl520";}
+elsif hwid=01:12:60:38:73 {set kmod = "hwp01170";}
+elsif hwid=01:12:60:38:73 {set kmod = "prism2_pci";}
+elsif hwid=01:12:6c:80:30 {set kmod = "emobility";}
+elsif hwid=01:12:82:90:09 {set kmod = "davicom9009";}
+elsif hwid=01:12:82:90:09 {set kmod = "dm9009";}
+elsif hwid=01:12:82:90:09 {set kmod = "dmfe9009";}
+elsif hwid=01:12:82:91:00 {set kmod = "davicom9100";}
+elsif hwid=01:12:82:91:00 {set kmod = "dm9100";}
+elsif hwid=01:12:82:91:00 {set kmod = "dmfe9100";}
+elsif hwid=01:12:82:91:02 {set kmod = "davicom9102";}
+elsif hwid=01:12:82:91:02 {set kmod = "dm9102";}
+elsif hwid=01:12:82:91:02 {set kmod = "dmfe9102";}
+elsif hwid=01:12:82:91:32 {set kmod = "davicom9132";}
+elsif hwid=01:12:82:91:32 {set kmod = "dm9132";}
+elsif hwid=01:12:82:91:32 {set kmod = "dmfe9132";}
+elsif hwid=01:12:c3:00:58 {set kmod = "holtek80232";}
+elsif hwid=01:12:c3:55:98 {set kmod = "holtek80229";}
+elsif hwid=01:13:17:09:81 {set kmod = "an981";}
+elsif hwid=01:13:17:09:85 {set kmod = "centaur-p";}
+elsif hwid=01:13:17:19:85 {set kmod = "centaur-c";}
+elsif hwid=01:13:17:95:11 {set kmod = "an983b";}
+elsif hwid=01:13:85:41:00 {set kmod = "ma301";}
+elsif hwid=01:13:d1:ab:02 {set kmod = "tulip-ab02";}
+elsif hwid=01:13:d1:ab:03 {set kmod = "tulip-ab03";}
+elsif hwid=01:13:d1:ab:06 {set kmod = "fe2000vx";}
+elsif hwid=01:13:d1:ab:08 {set kmod = "tulip-ab08";}
+elsif hwid=01:13:f0:02:01 {set kmod = "sundance";}
+elsif hwid=01:14:c1:00:08 {set kmod = "LANai-Z8E";}
+elsif hwid=01:14:e4:16:44 {set kmod = "tg3-5700";}
+elsif hwid=01:14:e4:16:45 {set kmod = "tg3-5701";}
+elsif hwid=01:14:e4:16:46 {set kmod = "tg3-5702";}
+elsif hwid=01:14:e4:16:47 {set kmod = "tg3-5703";}
+elsif hwid=01:14:e4:16:48 {set kmod = "tg3-5704";}
+elsif hwid=01:14:e4:16:4a {set kmod = "bnx2-5706";}
+elsif hwid=01:14:e4:16:4c {set kmod = "bnx2-5708";}
+elsif hwid=01:14:e4:16:4d {set kmod = "tg3-5702FE";}
+elsif hwid=01:14:e4:16:53 {set kmod = "tg3-5705";}
+elsif hwid=01:14:e4:16:54 {set kmod = "tg3-5705_2";}
+elsif hwid=01:14:e4:16:59 {set kmod = "tg3-5721";}
+elsif hwid=01:14:e4:16:5d {set kmod = "tg3-5705M";}
+elsif hwid=01:14:e4:16:5e {set kmod = "tg3-5705M_2";}
+elsif hwid=01:14:e4:16:77 {set kmod = "tg3-5751";}
+elsif hwid=01:14:e4:16:96 {set kmod = "tg3-5782";}
+elsif hwid=01:14:e4:16:9c {set kmod = "tg3-5788";}
+elsif hwid=01:14:e4:16:a6 {set kmod = "tg3-5702X";}
+elsif hwid=01:14:e4:16:a7 {set kmod = "tg3-5703X";}
+elsif hwid=01:14:e4:16:a8 {set kmod = "tg3-5704S";}
+elsif hwid=01:14:e4:16:aa {set kmod = "bnx2-5706S";}
+elsif hwid=01:14:e4:16:ac {set kmod = "bnx2-5708S";}
+elsif hwid=01:14:e4:16:c6 {set kmod = "tg3-5702A3";}
+elsif hwid=01:14:e4:16:c7 {set kmod = "tg3-5703A3";}
+elsif hwid=01:14:e4:17:0d {set kmod = "tg3-5901";}
+elsif hwid=01:14:e4:17:0e {set kmod = "tg3-5901_2";}
+elsif hwid=01:14:ea:ab:06 {set kmod = "fnw3603tx";}
+elsif hwid=01:14:ea:ab:07 {set kmod = "fnw3800tx";}
+elsif hwid=01:14:f1:18:03 {set kmod = "lanfinity";}
+elsif hwid=01:15:00:13:60 {set kmod = "delta8139";}
+elsif hwid=01:15:16:08:00 {set kmod = "MTD800";}
+elsif hwid=01:15:16:08:03 {set kmod = "MTD803";}
+elsif hwid=01:15:16:08:91 {set kmod = "MTD891";}
+elsif hwid=01:15:b3:5a:44 {set kmod = "MT23108";}
+elsif hwid=01:15:b3:62:74 {set kmod = "MT25204";}
+elsif hwid=01:15:b3:62:78 {set kmod = "MT25208";}
+elsif hwid=01:15:b3:62:82 {set kmod = "MT25218";}
+elsif hwid=01:15:e8:01:30 {set kmod = "correga";}
+elsif hwid=01:16:26:84:10 {set kmod = "tulip-8410";}
+elsif hwid=01:16:38:11:00 {set kmod = "smc2602w";}
+elsif hwid=01:16:ab:11:00 {set kmod = "gl24110p";}
+elsif hwid=01:16:ab:11:01 {set kmod = "16ab-1101";}
+elsif hwid=01:16:ab:11:02 {set kmod = "wdt11";}
+elsif hwid=01:16:ec:01:16 {set kmod = "rtl8169-0x0116";}
+elsif hwid=01:16:ec:36:85 {set kmod = "usr2415";}
+elsif hwid=01:17:37:10:32 {set kmod = "rtl8169-0x1032";}
+elsif hwid=01:17:37:ab:08 {set kmod = "tulip-1737-ab08";}
+elsif hwid=01:17:37:ab:09 {set kmod = "tulip-ab09";}
+elsif hwid=01:17:3b:03:e8 {set kmod = "tg3-ac1000";}
+elsif hwid=01:17:3b:03:e9 {set kmod = "tg3-ac1001";}
+elsif hwid=01:17:3b:03:ea {set kmod = "tg3-ac9100";}
+elsif hwid=01:17:3b:03:eb {set kmod = "tg3-ac1003";}
+elsif hwid=01:19:24:07:03 {set kmod = "falcon";}
+elsif hwid=01:19:24:c1:01 {set kmod = "ef1002";}
+elsif hwid=01:1a:f4:10:00 {set kmod = "virtio-net";}
+elsif hwid=01:40:33:13:60 {set kmod = "addtron8139";}
+elsif hwid=01:4a:14:50:00 {set kmod = "nv5000sc";}
+elsif hwid=01:80:86:00:39 {set kmod = "intel21145";}
+elsif hwid=01:80:86:10:00 {set kmod = "e1000-82542";}
+elsif hwid=01:80:86:10:01 {set kmod = "e1000-82543gc-fiber";}
+elsif hwid=01:80:86:10:04 {set kmod = "e1000-82543gc-copper";}
+elsif hwid=01:80:86:10:08 {set kmod = "e1000-82544ei-copper";}
+elsif hwid=01:80:86:10:09 {set kmod = "e1000-82544ei-fiber";}
+elsif hwid=01:80:86:10:0c {set kmod = "e1000-82544gc-copper";}
+elsif hwid=01:80:86:10:0d {set kmod = "e1000-82544gc-lom";}
+elsif hwid=01:80:86:10:0e {set kmod = "e1000-82540em";}
+elsif hwid=01:80:86:10:0f {set kmod = "e1000-82545em-copper";}
+elsif hwid=01:80:86:10:10 {set kmod = "e1000-82546eb-copper";}
+elsif hwid=01:80:86:10:11 {set kmod = "e1000-82545em-fiber";}
+elsif hwid=01:80:86:10:12 {set kmod = "e1000-82546eb-fiber";}
+elsif hwid=01:80:86:10:13 {set kmod = "e1000-82541ei";}
+elsif hwid=01:80:86:10:15 {set kmod = "e1000-82540em-lom";}
+elsif hwid=01:80:86:10:16 {set kmod = "e1000-82540ep-lom";}
+elsif hwid=01:80:86:10:17 {set kmod = "e1000-82540ep";}
+elsif hwid=01:80:86:10:18 {set kmod = "e1000-82541ep";}
+elsif hwid=01:80:86:10:19 {set kmod = "e1000-82547ei";}
+elsif hwid=01:80:86:10:1d {set kmod = "e1000-82546eb-quad-copper";}
+elsif hwid=01:80:86:10:1e {set kmod = "e1000-82540ep-lp";}
+elsif hwid=01:80:86:10:26 {set kmod = "e1000-82545gm-copper";}
+elsif hwid=01:80:86:10:27 {set kmod = "e1000-82545gm-fiber";}
+elsif hwid=01:80:86:10:28 {set kmod = "e1000-82545gm-serdes";}
+elsif hwid=01:80:86:10:29 {set kmod = "id1029";}
+elsif hwid=01:80:86:10:30 {set kmod = "id1030";}
+elsif hwid=01:80:86:10:31 {set kmod = "82801cam";}
+elsif hwid=01:80:86:10:32 {set kmod = "eepro100-1032";}
+elsif hwid=01:80:86:10:33 {set kmod = "eepro100-1033";}
+elsif hwid=01:80:86:10:34 {set kmod = "eepro100-1034";}
+elsif hwid=01:80:86:10:35 {set kmod = "eepro100-1035";}
+elsif hwid=01:80:86:10:36 {set kmod = "eepro100-1036";}
+elsif hwid=01:80:86:10:37 {set kmod = "eepro100-1037";}
+elsif hwid=01:80:86:10:38 {set kmod = "id1038";}
+elsif hwid=01:80:86:10:39 {set kmod = "82562et";}
+elsif hwid=01:80:86:10:3a {set kmod = "id103a";}
+elsif hwid=01:80:86:10:3b {set kmod = "82562etb";}
+elsif hwid=01:80:86:10:3c {set kmod = "eepro100-103c";}
+elsif hwid=01:80:86:10:3d {set kmod = "eepro100-103d";}
+elsif hwid=01:80:86:10:3e {set kmod = "eepro100-103e";}
+elsif hwid=01:80:86:10:50 {set kmod = "82562ez";}
+elsif hwid=01:80:86:10:51 {set kmod = "eepro100-1051";}
+elsif hwid=01:80:86:10:51 {set kmod = "prove";}
+elsif hwid=01:80:86:10:59 {set kmod = "82551qm";}
+elsif hwid=01:80:86:10:75 {set kmod = "e1000-82547gi";}
+elsif hwid=01:80:86:10:76 {set kmod = "e1000-82541gi";}
+elsif hwid=01:80:86:10:77 {set kmod = "e1000-82541gi-mobile";}
+elsif hwid=01:80:86:10:78 {set kmod = "e1000-82541er";}
+elsif hwid=01:80:86:10:79 {set kmod = "e1000-82546gb-copper";}
+elsif hwid=01:80:86:10:7a {set kmod = "e1000-82546gb-fiber";}
+elsif hwid=01:80:86:10:7b {set kmod = "e1000-82546gb-serdes";}
+elsif hwid=01:80:86:10:7c {set kmod = "e1000-82541pi";}
+elsif hwid=01:80:86:10:96 {set kmod = "e1000_80003es2lan";}
+elsif hwid=01:80:86:12:09 {set kmod = "82559er";}
+elsif hwid=01:80:86:12:27 {set kmod = "82865";}
+elsif hwid=01:80:86:12:28 {set kmod = "82556";}
+elsif hwid=01:80:86:12:29 {set kmod = "eepro100";}
+elsif hwid=01:80:86:24:49 {set kmod = "82562em";}
+elsif hwid=01:80:86:24:59 {set kmod = "82562-1";}
+elsif hwid=01:80:86:24:5d {set kmod = "82562-2";}
+elsif hwid=01:80:86:52:00 {set kmod = "eepro100-5200";}
+elsif hwid=01:80:86:52:01 {set kmod = "eepro100-5201";}
+elsif hwid=01:8e:2e:30:00 {set kmod = "ktiet32p2";}
+elsif hwid=01:ec:80:ec:00 {set kmod = "f5d6000";}
+elsif hwid=01:fe:fe:ef:ef {set kmod = "pnic";}
+elsif hwid=01:ff:ff:81:39 {set kmod = "clone-rtl8139";}
+option etherboot.kmod = kmod;
 
 log(debug,concat ( "bsdp:",binary-to-ascii ( 10, 8, ".", option bsdp.reply_port)));
 if exists bsdp.reply_port {
@@ -593,60 +719,49 @@ if exists bsdp.reply_port {
 #log(debug, option vendor-class-identifier);
 if substring (option vendor-class-identifier, 0, 9) = "PXEClient" {
 	log(debug, "1.pxe");
-	log(debug, binary-to-ascii(10,16,",", option client-arch));
 
 	#option pxelinux.reboottime	code 211 = unsigned integer 32;
-	site-option-space "pxelinux";
+	#site-option-space "pxelinux";
 
 	if exists dhcp-parameter-request-list {
-		option dhcp-parameter-request-list = concat (option dhcp-parameter-request-list,d0,d1,d2,d3);
+		option dhcp-parameter-request-list = concat (option dhcp-parameter-request-list,d0,d1,d2,d3,af);
+	}
+
+	if not exists ipxe.http {
+	}elsif not exists dhcp-server-identifier {
+		log(debug, "no server identifier");
+		option pxelinux.pathprefix "http://$ip/tftpboot/";
+	}else{
+		option pxelinux.pathprefix = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
 	}
 
 	if (
 		exists ipxe.http and
 		exists ipxe.menu and
-		#exists ipxe.nfs and
+		exists ipxe.nfs and
 		( ( exists ipxe.pxe and
 			exists ipxe.bzimage and
 			exists ipxe.elf and
-		#	exists ipxe.comboot and
+			exists ipxe.comboot and
 			exists ipxe.iscsi
 		) or (
 			exists ipxe.efi
 		) )
 	) {
 		log(debug, "2.menu");
+		option ipxe.no-pxedhcp 1;
 		if exists dhcp-server-identifier {
 			log(debug, concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/ipxe/boot.ipxe"));
 			filename = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/ipxe/boot.ipxe");
 			option pxelinux.pathprefix = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
-			#option pxelinux.configfile "~";
 		} else {
 			log(debug, "no server identifier");
-			#option pxelinux.pathprefix "http://192.168.0.1/tftpboot/";
-			#filename "http://192.168.0.1/ipxe/boot";
 		}
-		if exists tftp-server-name {
-			log(debug, binary-to-ascii( 10,8, ".", config-option tftp-server-name));
-			log(debug, "-");
-			log(debug, binary-to-ascii( 10,8, ".", option tftp-server-name));
-			log(debug, "-");
-			log(debug, binary-to-ascii( 10,8, ".", tftp-server-name));
-		} else {
-			log(debug, "no tftp");
-		}
-		log(debug, "-");
-		log(debug, config-option bootfile-name);
-		log(debug, "-");
-		log(debug, option bootfile-name);
-		log(debug, "-");
-		log(debug, bootfile-name);
-		log(debug, "x");
 	} elsif not exists client-arch {
 		log(debug, "2.unk");
 		#guessing . . .
 		filename "undionly.kpxe";
-	} elsif substr(option client-arch,0) = option client-arch {
+	} elsif substring(option client-arch,0,0) = option client-arch {
 		log(debug, "2.null");
 		#guessing . . .
 		filename "undionly.kpxe";
@@ -656,6 +771,7 @@ eof
 	} else {
 		log(debug, "2.X");
 		log(debug, option client-arch);
+		log(debug, binary-to-ascii(10,16,",", option client-arch));
 		#guessing . . .
 		#filename "/tftpboot/pxelinux-i386.0";
 		filename "undionly.kpxe";
@@ -716,6 +832,8 @@ eof
 			#log(debug, "bsdp_msgtype_list");
 
 			option bsdp.message_type 1;			# list
+
+			option bsdp.boot_image_list
 eof
 	print @b;
 	print <<"eof";
@@ -760,22 +878,10 @@ eof
 	# Also pass filename back in filename field
 	#
 	option bootfile-name = pick-first-value (
-		concat (
-			"boot-",
-			config-option etherboot.kmod,
-			".nbi"
-		),
-		#"/grub2/grub.pxe",
-		#"debian-live/i386/vmlinuz-2.6.32-5-486.nb",
-		"/lts/vmlinuz-2.6.17.8-ltsp-1",
-		"boot.nbi"
+		concat ("etherboot/",kmod,".nb"),
+		"boot.nb"
 	);
-	if option etherboot.nic-dev-id = 01:80:86:10:0e {
-		option etherboot.kmod "e1000-82540em";
-		filename = "/grub2/grub.pxe";
-	} else{
-		filename = config-option bootfile-name;
-	}
+	filename = config-option bootfile-name;
 
 	#option etherboot.kernel-cmdline " boot=live config netboot=nfs nfsroot=192.168.218.1:/srv/debian-live quiet";
 
@@ -795,7 +901,7 @@ eof
 		":",
 		config-option bootfile-name,
 		" [",
-		pick-first-value ( config-option etherboot.kmod, "unknown module" ),
+		pick-first-value ( kmod, "unknown module" ),
 		"]", 0d:0a
 	);
 
@@ -835,9 +941,6 @@ eof
 		option legacy-etherboot-image-15	= config-option etherboot.image-15;
 		option legacy-etherboot-image-16	= config-option etherboot.image-16;
 	}
-} elsif substring (option vendor-class-identifier, 0, 5) = "LTSP-"{
-	log(debug, "1.ltsp");
-	option root-path = concat ( config-option tftp-server-name, ":/opt/ltsp-4.2/", substring(option vendor-class-identifier, 5, 99));
 } elsif(option vendor-class-identifier = "d-i"){
 	log(debug, "1.d-i");
 	filename = concat ("http://",binary-to-ascii ( 10, 8, ".", config-option dhcp-server-identifier),"/debian/preseed.cfg");
@@ -848,9 +951,14 @@ eof
 } elsif substring (option vendor-class-identifier, 0, 2) = "PC"{
 	log(debug, "1.pc");
 	filename = "yaboot.pc";
+} elsif substring (option vendor-class-identifier, 0, 8) = "MSFT 5.0"{
+	log(debug, "1.msft");
+} elsif substring (option vendor-class-identifier, 0, 5) = "LTSP-"{
+	log(debug, "1.ltsp");
+	option root-path = concat ( config-option tftp-server-name, ":/opt/ltsp-4.2/", substring(option vendor-class-identifier, 5, 99));
 } elsif exists vendor-class-identifier {
 	log(debug, "1.unknown");
-			option bsdp.boot_image_list
+	    option bsdp.boot_image_list
 eof
 	print @b;
 	print <<"eof";
@@ -863,7 +971,7 @@ eof
 		log(debug, "1.none.1");
 		#log(debug, binary-to-ascii(16,8, " ", option dhcp-message-type));
 		#guessing . . .
-		filename "_undionly.kpxe";
+		filename "ipxe.ipxe";
 	} else {
 		#log(debug, "1.none.2");
 	}
@@ -871,11 +979,11 @@ eof
 	log(debug, "1.old mac");
 	option dhcp-max-message-size 576;
 	option dhcp-parameter-request-list
-	              1, # subnet mask
-	              3, # routers
-		66, # server-name
+              1, # subnet mask
+              3, # routers
+	     66, # server-name
 
-	              220, 221, 230, 232, 233, 234, 235, 236, 237, 238; # mac options
+	    220, 221, 230, 232, 233, 234, 235, 236, 237, 238; # mac options
 
 	# put global macnc-specific options here...
 	#option mac-version 0:0:0:0;
@@ -906,6 +1014,13 @@ include "/etc/dhcp/failover.conf";
 
 
 # A fallback hostname, generated from the IP address
+if static {
+	log(debug,"static");
+} elsif known {
+	log(debug,"known");
+} else {
+	log(debug,"unknown");
+}
 option host-name = concat ( "client_", binary-to-ascii ( 10, 8, "_", leased-address ) );
 
 # client loging

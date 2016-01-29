@@ -394,11 +394,11 @@ if cpuid -l ; then
 	set xarch=amd64
 else
 	set arch=i386
-	#if cpuid -p ; then
-	#	set xarch=i686-pae
-	#else
+	if cpuid -p ; then
+		set xarch=i686-pae
+	else
 		set xarch=i586
-	#fi
+	fi
 fi
 export arch
 
@@ -816,20 +816,26 @@ isset ${vmx} || isset ${svm} && set hw_virt yes ||
 set space:hex 20
 set lf:hex 0a
 set esc:hex 1b
-isset ${video} || set video gtk
-isset ${vid} || set vid ${video}
-isset ${debug} || set debug 5
-isset ${preseed} || set preseed http://${pxe_default_server}/debian/preseed.cfg
-isset ${npreseed} || set npreseed http://${pxe_default_server}/debian/preseed.cfg2
-isset ${desktop} || set desktop xfce
-isset ${dpreseed} || set dpreseed url=${preseed}
-isset ${ddesktop} || set ddesktop desktop=${desktop}
-isset ${dvideo} || set dvideo video=vesa:ywrap,mtrr vga=788
-isset ${dmode} || set dmode -- quiet
 
 EOF
-			print {$h} ('	'x$o), 'set default="'.$e->{default}."\"\n\n" if defined $e->{default};
-			print {$h} ('	'x$o), 'set timeout='.$e->{timeout}."\n\n" if defined $e->{timeout};
+			if(defined $e->{npreseed}){
+				$e->{snpreseed}=$e->{npreseed};
+				$e->{snpreseed}=~s!^.*/!!;
+			}
+			print {$h} 'isset ${'.$_.'} || set '.$_.' '.$e->{$_}."\n" foreach (grep {$e->{$_}} qw(
+				video debug preseed npreseed snpreseed desktop default timeout
+				dvideo dmode
+			));
+			print {$h} "\n";
+			print {$h} 'isset ${'.$_.'} || set '.$_.' '.$e->{$_}."\n" foreach (grep {$e->{$_}} qw(
+				vid dpreseed ddesktop
+			));
+			print {$h} << 'EOF';
+isset ${vid} || set vid ${video}
+isset ${dpreseed} || set dpreseed url=${preseed}
+isset ${ddesktop} || set ddesktop desktop=${desktop}
+EOF
+			print {$h} "\n";
 		},
 		gap=>sub{
 			my $h=shift; #handle
@@ -1041,11 +1047,20 @@ EOF
 			print {$h} q(:chco-),$e->{tag}, qq(\nread command || clear command \ngoto $e->{tag}-cont\n);
 			print {$h} q(:chpr-),$e->{tag}, qq(\nread npreseed || clear npreseed \ngoto $e->{tag}-cont\n);
 			print {$h} q(:),$e->{tag}, qq(-boot\necho	Loading kernel ...\n);
-			print {$h} q(kernel	${kernel} ${command} || goto debug-),$e->{tag};
+			print {$h} q(kernel	${kernel} ${command});
+			if(('linux'eq$e->{subtype}||'linux16'eq$e->{subtype}) && ! $e->{flags}{nolinuxinitrd}){
+				print {$h} q( initrd=${snpreseed}) if $e->{flags}{npreseed};
+				if(defined $e->{initrd}){
+					my $initrds=$e->{initrd};
+					$initrds=~s!^.*/!!;
+					print {$h} qq( initrd=${initrds});
+				}
+			}
+			print {$h} q( || goto debug-),$e->{tag};
 			print {$h} qq(\necho	Loading initial ramdisk ...\ninitrd	\${initrd});
 ################################################################################
 			#print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
-			print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed} /preseed.cfg) if defined $e->{flags} and 'npreseed'eq$e->{flags};
+			print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed}) if $e->{flags}{npreseed};
 			print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\n:boot-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 			print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{tag}\n\n);
 		},
@@ -1284,10 +1299,18 @@ $i{ipxe2}{basic}=sub{
 	print {$h} qq(\necho	Loading kernel ...\n);
 	print {$h} qq(kernel	$e->{kernel});
 	print {$h} qq( $e->{command}) if defined $e->{command};
+	if($e->{flags}{npreseed} && ('linux'eq$e->{type}||'linux16'eq$e->{type}) && ! $e->{flags}{nolinuxinitrd}){
+		print {$h} q( initrd=${snpreseed});
+	}
+	if(defined $e->{initrd} && ('linux'eq$e->{type}||'linux16'eq$e->{type}) && ! $e->{flags}{nolinuxinitrd}){
+		my $initrds=$e->{initrd};
+		$initrds=~s!^.*/!!;
+		print {$h} qq( initrd=${initrds});
+	}
 ################################################################################
 	print {$h} qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$e->{initrd}) if defined $e->{initrd};
 	print {$h} map {qq( || goto debug-$e->{tag}\necho	Loading initial ramdisk ...\ninitrd	$_)} split /:/, $e->{xinitrd} if defined $e->{xinitrd};
-	print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed} /preseed.cfg) if defined $e->{flags} and 'npreseed'eq$e->{flags};
+	print {$h} qq( || goto debug-$e->{tag}\nisset \${npreseed} || goto boot-$e->{tag}\necho	Loading ramdisk preseed ...\ninitrd	\${npreseed}) if $e->{flags}{npreseed};
 	print {$h} qq( || goto debug-$e->{tag}\nimgstat || goto debug-$e->{tag}\n:boot-$e->{tag}\necho	Booting ...\nboot || goto debug-$e->{tag}\nimgfree || goto debug-$e->{tag}\ngoto $e->{under}\n\n);
 	print {$h} q(:debug-),$e->{tag},qq(\nshell\ngoto $e->{under}\n\n);
 };
@@ -1367,6 +1390,9 @@ while (<>){
 			my @a = grep {$_ eq$mode} split /,/, $2;
 			next if scalar @a;
 			$order[$count]{lc($1)}++;
+		}elsif(/^(flags)[ 	]*=[ 	]*(.*)$/i){
+			my @a = split /,/, $2;
+			$order[$count]{lc($1)}{lc($_)}++ foreach @a;
 		}elsif(/^([0-9a-zA-Z_]+)[ 	]*=[ 	]*(.*)$/){
 			$order[$count]{lc($1)}=$2;
 		}else{
