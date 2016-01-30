@@ -54,5 +54,17 @@ diff: all debhd.grub grubtemp
 	diff -q debhd.grub grubtemp||gvimdiff -f debhd.grub grubtemp
 	diff -q debhd.menu debhd2.menu||gvimdiff -f debhd.menu debhd2.menu
 
+distclean:
+	rm -f $(patsubst %.menu, %.set,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu, %.ipxe,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu, %.grub, $(wildcard *.menu))||true
+	rm -f $(patsubst %.menu, %.slcfg, $(wildcard *.menu))||true
+	rm -f $(patsubst %.menu,%.i386.cfg,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu,%.amd64.cfg,$(wildcard *.menu))||true
+
+reallyclean: distclean
+	rm -f $(patsubst %.menu, %.pot,$(wildcard *.menu))||true
+
+
 diffx: diff
 	#diff -q main.grub grubtemp||gvimdiff -f main.grub grubtemp
