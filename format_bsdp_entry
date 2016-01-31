@@ -1,7 +1,7 @@
 #!/usr/bin/perl -pw
 use strict;
 use warnings;
-our ($c,@a,@b,@c);
+our ($c,@a,@b,@c,$bsdp_default,@arch);
 BEGIN{
 	my $ip='192.168.0.1';
 	print <<"eof";$c++;
@@ -709,6 +709,7 @@ elsif hwid=01:8e:2e:30:00 {set kmod = "ktiet32p2";}
 elsif hwid=01:ec:80:ec:00 {set kmod = "f5d6000";}
 elsif hwid=01:fe:fe:ef:ef {set kmod = "pnic";}
 elsif hwid=01:ff:ff:81:39 {set kmod = "clone-rtl8139";}
+else{set kmod = "unknown"}
 option etherboot.kmod = kmod;
 
 log(debug,concat ( "bsdp:",binary-to-ascii ( 10, 8, ".", option bsdp.reply_port)));
@@ -796,13 +797,23 @@ eof
 		log(debug, binary-to-ascii(16, 8, ":", option bsdp.message_type));
 eof
 }
-if(s!^(\d+)[ 	]+(\d+)[ 	]+(\d+|auto)[ 	]+(.*)$!
-	my ($a,$b,$d,$e)=($1,$2,('auto'eq$3?$c++:$3),$4);
-	my $tab = "\t"x(5-(length($4)*3+7)/8);
-	my $f=join q(:), grep({$_} split(/(..)/,unpack(q(H*),pack(q(CxnC/a),($1<<7)+$2,$d,$4)))),"$tab\t# Name (length ".length($4).") '$4'";
-	$f=~s/^(..:..:..:..):/push @a,$1;"\t\t\t\t$1:\t\t\t\t\t# Image ".($a?"":"non-")."install ID $d\n\t\t\t\t\t"/e;
-	$f!e
-){push @b,$_;$_='';}
+our %files;
+if(/^#/){$_='';next;}
+elsif(/^a[ 	]+(.*)$/){push @arch, $1;$_='';}
+elsif(s!^d[ 	]+(\d+)[ 	]+(\d+)[ 	]+(\d+|auto)$!
+	my ($a,$b,$d)=($1,$2,('auto'eq$3?$c:$3));
+	my $g=join q(:),
+		grep({$_} split(/(..)/,unpack(q(H*),pack(q(Cxn),($1<<7)+$2,$d))));
+	"\t\toption bsdp.default_boot_image_id ".$g.";	# Image ID (".($d).")";
+	!e
+){$bsdp_default=$_}
+elsif(s!^(\d+)[ 	]+(\d+)[ 	]+(\d+|auto)[ 	]+([^ 	]*)[ 	]+(.*)$!
+	my ($a,$b,$d,$e,$f)=($1,$2,('auto'eq$3?$c++:$3),$5,$4);
+	my $tab = "\t"x(5-(length($5)*3+7)/8);
+	my $g=join q(:), grep({$_} split(/(..)/,unpack(q(H*),pack(q(CxnC/a),($1<<7)+$2,$d,$5)))),"$tab\t# Name (length ".length($5).") '$5'";
+	$g=~s/^(..:..:..:..):/push @a,$1;$files{$1}=$f;"\t\t\t$1:\t\t\t\t\t# Image ".($a?"":"non-")."install ID $d\n\0\t\t\t\t"/e;
+	$g!e
+){push @b,split /\0/, $_;$_='';}
 END{
 	$b[-1]=~s!:(\t+# N)!;$1!;
 	print <<"eof";
@@ -812,7 +823,7 @@ END{
 		#filename "/debian-installer/powerpc/./grub";
 		#filename "/debian-installer/powerpc64/./grub";
 
-			option bsdp.boot_image_list
+		option bsdp.boot_image_list
 eof
 	print @b;
 	print <<"eof";
@@ -821,7 +832,7 @@ eof
 		log(debug, binary-to-ascii(16, 8, ":", option bsdp.message_type));
 		option bsdp.default_boot_image_id 01:00:00:01;	# Image ID (1)
 		filename "1.bsdp.3";
-			option bsdp.boot_image_list
+		option bsdp.boot_image_list
 eof
 	print @b;
 	print <<"eof";
@@ -832,10 +843,13 @@ eof
 			#log(debug, "bsdp_msgtype_list");
 
 			option bsdp.message_type 1;			# list
+eof
+	print "\t",$bsdp_default;
+	print <<"eof";
 
 			option bsdp.boot_image_list
 eof
-	print @b;
+	print "\t",join "\t",@b;
 	print <<"eof";
 		} elsif option bsdp.message_type = 2 {
 			log(debug, "1.bsdp.8.2_select");
@@ -845,7 +859,14 @@ eof
 
 			option bsdp.message_type 2;			# select
 eof
-	print "\t\t	if option bsdp.selected_boot_image_id = ".join("\n\t\t\t} elsif option bsdp.selected_boot_image_id = ",map {$_." {\n\t\t\t\toption bsdp.selected_boot_image_id ".$_.";\n\t\t\t\tif (substring(option vendor-class-identifier, 9, 5) = \"/i386\") {\n\t\t\t\t} elsif (substring(option vendor-class-identifier, 9, 4) = \"/ppc\") {\n\t\t\t\t} else {\n\t\t\t\t}"} @a)."\n";
+	print "\t\t	if option bsdp.selected_boot_image_id = ".join("
+			} elsif option bsdp.selected_boot_image_id = ",map {my $a=$_;my $f=$files{$a};my $b=$_." {
+				option bsdp.selected_boot_image_id ".$_.";
+				";if('-'eq$f){$b.="#filename \"\";"}elsif($f=~/,/){my %f;@f{@arch,'default'}=split /,/, $f;$b.=(join '', map {"if (substring(option vendor-class-identifier, 9, ".(length($_)+1).") = \"/$_\") {
+					filename \"$f{$_}\";
+				} els"} @arch )."e {
+					filename ".($f{default}?"\"$f{default}\"":'= option vendor-class-identifier').";
+				}"}else{$b.="filename \"$files{$a}\";"}$b.""} @a)."\n";
 	print <<"eof";
 			} else {
 				log(info, "bspd_selected_unknown_image");
@@ -950,7 +971,7 @@ eof
 	log(debug, option vendor-class-identifier);
 } elsif substring (option vendor-class-identifier, 0, 2) = "PC"{
 	log(debug, "1.pc");
-	filename = "yaboot.pc";
+	filename "yaboot.pc";
 } elsif substring (option vendor-class-identifier, 0, 8) = "MSFT 5.0"{
 	log(debug, "1.msft");
 } elsif substring (option vendor-class-identifier, 0, 5) = "LTSP-"{
@@ -958,7 +979,7 @@ eof
 	option root-path = concat ( config-option tftp-server-name, ":/opt/ltsp-4.2/", substring(option vendor-class-identifier, 5, 99));
 } elsif exists vendor-class-identifier {
 	log(debug, "1.unknown");
-	    option bsdp.boot_image_list
+		option bsdp.boot_image_list
 eof
 	print @b;
 	print <<"eof";
@@ -988,7 +1009,6 @@ eof
 	# put global macnc-specific options here...
 	#option mac-version 0:0:0:0;
 	filename "yaboot";
-	next-server = config-option dhcp-server-identifier; # your tftp server
 } else {
 	log(debug, "1.help");
 	log(debug, option mac-nc-client-id);
@@ -1012,6 +1032,27 @@ include "/etc/dhcp/failover.conf";
 #  dynamic hosts  #
 ###################
 
+subnet 192.168.0.0 netmask 255.255.255.0 {
+	option broadcast-address	192.168.0.255;
+	option routers			192.168.0.254;
+	option subnet-mask		255.255.255.0;
+
+	pool {
+		range 192.168.0.50 192.168.0.99;
+		default-lease-time 7200; # 2 hours
+		max-lease-time 86400; # 1 day
+		deny unknown-clients;
+	}
+
+	pool {
+		range 192.168.0.100 192.168.0.199;
+		default-lease-time 3600; # 1 hour
+		max-lease-time 7200; # 2 hours
+		allow unknown-clients;
+		deny known-clients;
+	}
+	#range dynamic-bootp 192.168.0.200 192.168.0.224;
+}
 
 # A fallback hostname, generated from the IP address
 if static {
@@ -1033,7 +1074,6 @@ set linksel = option agent.link-selection;
 #set fname = config-option filename;
 set cname = config-option host-name;
 set nic = pick-first-value ( option etherboot.nic-dev-id, "unknown card" );
-set kmod = pick-first-value ( config-option etherboot.kmod, "unknown module" );
 
 eof
 }

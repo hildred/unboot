@@ -1,6 +1,32 @@
-0 1 auto NetBoot
-1 1 auto NetRestore
-0 2 auto test1
-1 2 auto test2
-0 3 auto test3
-1 3 auto test4
+# Comments begin with hash in first coloum.
+#
+# Statements are whitespace seperated values without qouting.
+#
+# Arch statements begin with 'a'.
+# The order of arch statements is reflected in the order of arch detection in dhcpd.conf
+# and the split order for filenames.
+a ppc
+a i386
+#---
+# Default statements begin with 'd'.
+# The second coloum is the install flag, one for install, zero for normal 
+# The third coloum is the type number, 0 os9, 1 osX, osX server, 3 hw diag
+# The fourth coloum is the unique identifier or 'auto' for automatic uid generation. auto substitutes the next auto ided image. 
+d 0 1 auto
+#---
+# Boot image statements begin with the install flag
+# The first coloum is the install flag, one for install, zero for normal 
+# The second coloum is the type number, 0 os9, 1 osX, osX server, 3 hw diag
+# The third coloum is the unique identifier or 'auto' for automatic uid generation. auto substitutes the next auto ided image. 
+# The fourth coloum is the filename coloum, more on this in a minute.
+# The fifth and later coloums form the display name which is displayed to the user.
+#
+# The filename coloummay be a single dash to indicate that it is empty, a filename without comas or whitespace that is used on
+# all archetectures, or a coma seperated list of filenames in the order that the archectectures are listed in this file. If there
+# is one more file than archetectures it is used as a fallback instead of the default of the archecture name.
+0 1 auto /debian-installer/powerpc64/./yaboot,EFI32/ipxe.efi NetBoot
+1 1 auto - NetRestore
+0 2 auto -,- test1
+1 2 auto - test2
+0 3 auto - test3
+1 3 auto - test4
