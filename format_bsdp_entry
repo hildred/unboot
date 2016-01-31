@@ -184,7 +184,6 @@ eof
 				filename "http://%3$s/tftpboot/%5$sipxe.%4$s";
 			}else{
 				log(debug, "4.%1$d.old.http");
-				log(debug, concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s"));
 				filename = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s");
 			}
 		}elsif substring(option ipxe.busid,0,1)=1 {
@@ -194,7 +193,6 @@ eof
 						push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
 			if not exists ipxe.http {
 				log(debug, "4.%1$d.pci.tftp");
-				log(debug,concat("/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
 				filename= concat("/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
 			}elsif not exists dhcp-server-identifier {
 eof
@@ -206,11 +204,9 @@ eof
 					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
 				log(debug, "4.%1$d.pci.broken");
 				log(debug, "no server identifier");
-				log(debug,concat("http://%3$s/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
 				filename= concat("http://%3$s/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
 			}else{
 				log(debug, "4.%1$d.pci.http");
-				log(debug,concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s"));
 				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
 			}
 		}else{
@@ -220,7 +216,6 @@ eof
 						push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
 			if not exists ipxe.http {
 				log(debug, "4.%1$d.other.tftp");
-				log(debug,concat("/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
 				filename= concat("/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
 			}elsif not exists dhcp-server-identifier {
 eof
@@ -232,11 +227,9 @@ eof
 					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
 				log(debug, "4.%1$d.other.broken");
 				log(debug, "no server identifier");
-				log(debug,concat("http://%3$s/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
 				filename= concat("http://%3$s/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
 			}else{
 				log(debug, "4.%1$d.other.http");
-				log(debug,concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s"));
 				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
 			}
 		}
@@ -709,7 +702,7 @@ elsif hwid=01:8e:2e:30:00 {set kmod = "ktiet32p2";}
 elsif hwid=01:ec:80:ec:00 {set kmod = "f5d6000";}
 elsif hwid=01:fe:fe:ef:ef {set kmod = "pnic";}
 elsif hwid=01:ff:ff:81:39 {set kmod = "clone-rtl8139";}
-else{set kmod = "unknown"}
+else{set kmod = "unknown";}
 option etherboot.kmod = kmod;
 
 log(debug,concat ( "bsdp:",binary-to-ascii ( 10, 8, ".", option bsdp.reply_port)));
@@ -752,7 +745,6 @@ if substring (option vendor-class-identifier, 0, 9) = "PXEClient" {
 		log(debug, "2.menu");
 		option ipxe.no-pxedhcp 1;
 		if exists dhcp-server-identifier {
-			log(debug, concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/ipxe/boot.ipxe"));
 			filename = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/ipxe/boot.ipxe");
 			option pxelinux.pathprefix = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
 		} else {
@@ -878,7 +870,7 @@ eof
 	} else {
 		log(debug, "1.bsdp.?");
 		log(debug, binary-to-ascii(16,8,":", option dhcp-message-type));
-		log(debug,concat ( "bsdp:",binary-to-ascii ( 10, 8, ".", option bsdp.reply_port)));
+		log(debug,concat("bsdp:",binary-to-ascii(10,8,".",option bsdp.reply_port)));
 	}
 
 	if substring (option vendor-class-identifier, 9, 4) = "/ppc" {
@@ -1066,6 +1058,7 @@ option host-name = concat ( "client_", binary-to-ascii ( 10, 8, "_", leased-addr
 
 # client loging
 # ------ ------
+log(debug, filename);
 set vendor-string = option vendor-class-identifier;
 set circuit = option agent.circuit-id;
 set remote-id = option agent.remote-id;
