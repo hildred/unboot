@@ -1,7 +1,7 @@
 
 all: sets unboot.pot
-sets: $(patsubst %.menu,%.set,$(wildcard *.menu))
-extra: grubtemp grub
+sets: $(patsubst %.menu,%.set,$(wildcard *.menu)) debhd2.set 
+extra: grubtemp grub runclean distclean reallyclean diff diffx
 .PHONY: all sets extra
 .SECONDARY:
 LOCALIZABLE=./buildmenu
@@ -13,7 +13,7 @@ grub:
 	grub-mknetdir --compress=xz --net-directory=/tftpboot --subdir=grub --modules="bufio normal boot gfxterm video video_fb png echo echo gzio minicmd test"
 
 %.set: %.grub %.ipxe %.i386.cfg %.amd64.cfg %.pot
-	touch $@
+	@
 
 %.grub: %.menu buildmenu
 	./buildmenu grub $< > $@
@@ -54,16 +54,19 @@ diff: all debhd.grub grubtemp
 	diff -q debhd.grub grubtemp||gvimdiff -f debhd.grub grubtemp
 	diff -q debhd.menu debhd2.menu||gvimdiff -f debhd.menu debhd2.menu
 
-distclean:
-	rm -f $(patsubst %.menu, %.set,$(wildcard *.menu))||true
-	rm -f $(patsubst %.menu, %.ipxe,$(wildcard *.menu))||true
-	rm -f $(patsubst %.menu, %.grub, $(wildcard *.menu))||true
-	rm -f $(patsubst %.menu, %.slcfg, $(wildcard *.menu))||true
+runclean:
+	rm -f $(patsubst %.menu,%.set,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu,%.slcfg,$(wildcard *.menu))||true
+
+distclean: runclean
+	rm -f $(patsubst %.menu,%.set,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu,%.ipxe,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu,%.grub,$(wildcard *.menu))||true
 	rm -f $(patsubst %.menu,%.i386.cfg,$(wildcard *.menu))||true
 	rm -f $(patsubst %.menu,%.amd64.cfg,$(wildcard *.menu))||true
 
 reallyclean: distclean
-	rm -f $(patsubst %.menu, %.pot,$(wildcard *.menu))||true
+	rm -f $(patsubst %.menu, %.pot,$(wildcard *.menu)) unboot.pot ||true
 
 
 diffx: diff
