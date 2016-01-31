@@ -7,7 +7,7 @@ extra: grubtemp grub diff diffx
 LOCALIZABLE=./buildmenu
 
 test: all dhcpd.conf
-	/usr/sbin/dhcpd -t -cf ./dhcpd.conf
+	 if test -z "${TRAVIS}"; then /usr/sbin/dhcpd -d -t -cf ./dhcpd.conf; fi
 
 grub:
 	grub-mknetdir --compress=xz --net-directory=/tftpboot --subdir=grub --modules="bufio normal boot gfxterm video video_fb png echo echo gzio minicmd test"
