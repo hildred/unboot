@@ -3,7 +3,9 @@ use strict;
 use warnings;
 our ($c,@a,@b,@c,$bsdp_default,@arch);
 BEGIN{
-	my $ip='192.168.0.1';
+	#my $ip='192.168.0.1';
+	#my $ip='192.168.219.1';
+	my $ip='192.0.2.1';
 	print <<"eof";$c++;
 #########################
 #			#
@@ -392,12 +394,12 @@ option domain-search		"example.com";
 option domain-name-servers	$ip;
 option ntp-servers		$ip;
 option time-servers		$ip;
-option log-servers		192.168.0.2;
-option netbios-name-servers	192.168.0.3;
-option netbios-dd-server	192.168.0.3;
+option log-servers		192.0.2.2;
+option netbios-name-servers	192.0.2.3;
+option netbios-dd-server	192.0.2.3;
 option netbios-node-type	0x8;
 option netbios-scope		"";
-option lpr-servers		192.168.0.4;
+option lpr-servers		192.0.2.4;
 option time-offset		-25200; # MST
 option fqdn.no-client-update	true;
 
@@ -807,23 +809,18 @@ elsif(s!^(\d+)[ 	]+(\d+)[ 	]+(\d+|auto)[ 	]+([^ 	]*)[ 	]+(.*)$!
 	$g!e
 ){push @b,split /\0/, $_;$_='';}
 END{
-	$b[-1]=~s!:(\t+# N)!;$1!;
-	print <<"eof";
-		#filename "1.bsdp.1";
-		#filename "/debian-installer/powerpc/./yaboot"; #works but expects conf file in root.
-		filename "/debian-installer/powerpc64/./yaboot";
-		#filename "/debian-installer/powerpc/./grub";
-		#filename "/debian-installer/powerpc64/./grub";
+	#my $ip='192.168.0.1';
+	#my $ip='192.168.219.1';
+	my $ip='192.0.2.1';
 
-		option bsdp.boot_image_list
-eof
-	print @b;
+	$b[-1]=~s!:(\t+# N)!;$1!;
+	print "\n\t\toption bsdp.boot_image_list\n";
+	print @b,"\n";
 	print <<"eof";
 	} elsif (option dhcp-message-type = 3) {
 		log(debug, "1.bsdp.3");
 		log(debug, binary-to-ascii(16, 8, ":", option bsdp.message_type));
 		option bsdp.default_boot_image_id 01:00:00:01;	# Image ID (1)
-		filename "1.bsdp.3";
 		option bsdp.boot_image_list
 eof
 	print @b;
@@ -896,7 +893,7 @@ eof
 	);
 	filename = config-option bootfile-name;
 
-	#option etherboot.kernel-cmdline " boot=live config netboot=nfs nfsroot=192.168.218.1:/srv/debian-live quiet";
+	#option etherboot.kernel-cmdline " boot=live config netboot=nfs nfsroot=$ip:/srv/debian-live quiet";
 
 	# Info message (includes client IP address, MAC address, hardware ID string,
 	# server IP address and name of boot file)
@@ -1024,26 +1021,64 @@ include "/etc/dhcp/failover.conf";
 #  dynamic hosts  #
 ###################
 
-subnet 192.168.0.0 netmask 255.255.255.0 {
-	option broadcast-address	192.168.0.255;
-	option routers			192.168.0.254;
+################################################################################
+# RFC5737: The blocks 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2),
+# and 203.0.113.0/24 (TEST-NET-3) are provided for use in documentation.
+
+shared-network main {
+	subnet 192.0.2.0 netmask 255.255.255.0 { # TEST-NET-1
+		option subnet-mask		255.255.255.0;
+		option broadcast-address	192.0.2.255;
+		option routers			192.0.2.254;
+
+		pool {
+			#failover peer "TEST-NET-1";
+			range 192.0.2.100 192.0.2.199;
+			deny dynamic bootp clients;
+		}
+		#range dynamic-bootp 192.0.2.200 192.0.2.225;
+		#range dynamic-bootp 192.0.2.226 192.0.2.250;
+	}
+
+	subnet 198.51.100.0 netmask 255.255.255.0 { # TEST-NET-2
+		option subnet-mask		255.255.255.0;
+		option broadcast-address	198.51.100.255;
+		option routers			198.51.100.254;
+
+		pool {
+			#failover peer "TEST-NET-2a";
+			range 198.51.100.50 198.51.100.99;
+			default-lease-time 7200; # 2 hours
+			max-lease-time 86400; # 1 day
+			deny unknown-clients;
+			deny dynamic bootp clients;
+		}
+
+		pool {
+			#failover peer "TEST-NET-2b";
+			range 198.51.100.100 198.51.100.199;
+			default-lease-time 3600; # 1 hour
+			max-lease-time 7200; # 2 hours
+			deny known-clients;
+			deny dynamic bootp clients;
+		}
+		#range dynamic-bootp 198.51.100.200 198.51.100.225;
+		#range dynamic-bootp 198.51.100.226 198.51.100.250;
+	}
+}
+
+subnet 203.0.113.0 netmask 255.255.255.0 { # TEST-NET-3
 	option subnet-mask		255.255.255.0;
+	option broadcast-address	203.0.113.255;
+	option routers			203.0.113.254;
 
 	pool {
-		range 192.168.0.50 192.168.0.99;
-		default-lease-time 7200; # 2 hours
-		max-lease-time 86400; # 1 day
-		deny unknown-clients;
+		#failover peer "TEST-NET-3";
+		range 203.0.113.100 203.0.113.199;
+		deny dynamic bootp clients;
 	}
-
-	pool {
-		range 192.168.0.100 192.168.0.199;
-		default-lease-time 3600; # 1 hour
-		max-lease-time 7200; # 2 hours
-		allow unknown-clients;
-		deny known-clients;
-	}
-	#range dynamic-bootp 192.168.0.200 192.168.0.224;
+	#range dynamic-bootp 203.0.113.200 203.0.113.225;
+	#range dynamic-bootp 203.0.113.226 203.0.113.250;
 }
 
 # A fallback hostname, generated from the IP address
