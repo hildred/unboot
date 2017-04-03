@@ -1,5 +1,5 @@
-	#grub_theme=/grub/themes/starfield/theme.txt
-	#grub_background=/grub/lines-grub-1920x1080.png
+	grub_theme=/grub/themes/starfield/theme.txt
+	grub_background=/grub/lines-grub-1920x1080.png
 	lang	= en_US
 	prefix	= /tftpboot
 [san]
