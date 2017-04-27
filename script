@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 function grub {
 	local grubdir
@@ -36,50 +36,50 @@ function bs_test {
 function download {
 	local release
 	local version
-	local cc
+	local mirror
 	local quiet
 
 	quiet='--no-check-certificate'
 	#quiet='--no-check-certificate -nv'
 
-	cc="$1";shift
+	mirror="$1";shift
 	release="$1";shift
 	version="$1";shift
 
-	wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i - << EOF
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
+	false&&wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i - << EOF
+	${mirror}/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
+	${mirror}/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
+	${mirror}/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
+	${mirror}/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
 
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
 EOF
-	#http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/gtk/netboot.tar.gz
+#	${mirror}/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
+#	${mirror}/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
+#	${mirror}/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
+#	${mirror}/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/gtk/netboot.tar.gz
 
 	false&&wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer/"${release}" -i - << EOF
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinux
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot.conf
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinux
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot.conf
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
 
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinux
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot.conf
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
-	http://ftp.${cc}.debian.org/debian/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinux
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot.conf
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
+	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
 EOF
 }
 
@@ -91,38 +91,43 @@ function move {
 	release="$1";shift
 	version="$1";shift
 
-	false&&find debian-installer \! -type d|\
-	sed \
-		-e "s!^\(debian-installer/${release}/installer-\)\([^/]*/\)\(${version}/images/netboot[-0-9]*/\)\(netboot.tar.gz\)\$!mkdir -p ${version}-${release}/\2tmp/txt\&\&mv -i \1\2\3\4 ${version}-${release}/\2tmp/txt/\4!e" \
-		-e "s!^\(debian-installer/${release}/installer-\)\([^/]*/\)\(${version}/images/netboot[-0-9]*/\)\(gtk/netboot.tar.gz\)\$!mkdir -p ${version}-${release}/\2tmp/gtk\&\&mv -i \1\2\3\4 ${version}-${release}/\2tmp/\4!e" \
-		-e "s!^\(debian-installer/${release}/\)\([^/]*/\)\(netboot[-0-9]*/\)\(gtk/\)\([^/]*\)\$!mkdir -p ${version}-${release}/\2\&\&mv -i \1\2\3\4\5 ${version}-${release}/\2gtk-\5!e" \
-		-e "s!^\(debian-installer/${release}/\)\([^/]*/\)\(netboot[-0-9]*/\)\(vmlinux\|mini.iso\|initrd.gz\)\$!mkdir -p ${version}-${release}/\2\&\&mv -i \1\2\3\4 ${version}-${release}/\2txt-\4!e" \
-		-e "s!^\(debian-installer/${release}/\)\([^/]*/\)\(netboot[-0-9]*/\)\([^/]*\)\$!mkdir -p ${version}-${release}/\2\&\&mv -i \1\2\3\4 ${version}-${release}/\2\4!e" \
+	find debian-installer \! -type d -print0|\
+	sed -zr \
+		-e 's!^(debian-installer/${release}/installer-)([^/]*/)(${version}/images/netboot[-0-9]*/)(netboot.tar.gz)$!mkdir -p '"${version}-${release}"'/\2tmp/txt\&\&mv -i "&" '"${version}-${release}"'/\2tmp/txt/\4!e' \
+		-e 's!^(debian-installer/'"${release}"'/installer-)([^/]*/)(${version}/images/netboot[-0-9]*/)(gtk/netboot.tar.gz)$!mkdir -p '"${version}-${release}/\2tmp/gtk\&\&mv -i "&" ${version}-${release}/\2tmp/\4!e" \
+		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(gtk/)([^/]*)$!mkdir -p '"${version}-${release}/\2\&\&mv -i "&" ${version}-${release}/\2gtk-\5!e" \
+		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(vmlinux|mini.iso|initrd.gz)$!mkdir -p '"${version}-${release}/\2\&\&mv -i "&" ${version}-${release}/\2txt-\4!e" \
+		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)([^/]*)$!mkdir -p '"${version}-${release}"'/\2\&\&mv -i "&" '"${version}-${release}/\2\4!e" \
+		-e '/^$/d' \
 	&& echo ok
 
-	false&&find "${version}-${release}" \! -type d|\
-	sed \
-		-e "s!^\(${version}-${release}/[^/]*/tmp/\)\(txt/\|gtk/\)\(netboot.tar.gz\)\$!cd \1\2\&\&tar -xzf \3 \&\& rm \3!e" \
+	find "${version}-${release}" \! -type d -print0|\
+	sed -zr \
+		-e "s!^(${version}-${release}"'/[^/]*/tmp/)(txt/|gtk/)(netboot.tar.gz)$!cd \1\2\&\&tar -xzf \3 \&\& rm \3!e' \
+		-e '/^$/d' \
 	&& echo ok
 
-	find "${version}-${release}" \! -type d|\
-	sed \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/boot-screens/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/grub/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/grub/[x864_]*-efi/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/pxelinux.cfg/\)\([^/]*\)\$!if [ -L \1\2\3\4\5\2\6\7 ] ; then rm \1\2\3\4\5\2\6\7 ; elif [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt\|gtk\)\(/debian-installer/\)\2\(/initrd\)\(\.gz\)\$!if [ \! -e \"\1\2\6-\4\7\" ] ; then mkdir -p \1\2 \&\& mv -i \1\2\3\4\5\2\6\7 \1\2\6-\4\7 ; else echo duplicate; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/[^/]*\)\$!if [ -L \1\2\3\4\5\2\6 ] ; then rm \1\2\3\4\5\2\6 ; elif [ \! -e \"\1\2\6\" ] ; then mkdir -p \1\2 \&\& mv -it \1\2 \1\2\3\4\5\2\6 ; elif diff \1\2\6 \1\2\3\4\5\2\6 ; then rm \1\2\3\4\5\2\6 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2!\1 # \2 # \3 # \4 # \5 # !" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/tmp/\)\(txt\|gtk\)\(/[^/]*\)\$!if [ -L \1\2\3\4\5 ] ; then rm \1\2\3\4\5 ; elif [ \! -e \"\1\2\5\" ] ; then mkdir -p \1\2 \&\& mv -it \1\2 \1\2\3\4\5 ; elif diff \1\2\5 \1\2\3\4\5 ; then rm \1\2\3\4\5 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/boot-screens/\)\([^/]*\)\$!if [ -L \1\2\3\4 ] ; then rm \1\2\3\4 ; elif [ \! -e \"\1\3\4\" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 \1\2\3\4 ; elif diff -q \1\3\4 \1\2\3\4 ; then rm \1\2\3\4 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/grub/\)\([^/]*\)\$!if [ -L \1\2\3\4 ] ; then rm \1\2\3\4 ; elif [ \! -e \"\1\3\4\" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 \1\2\3\4 ; elif diff -q \1\3\4 \1\2\3\4 ; then rm \1\2\3\4 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*\)\(/grub/[x864_]*-efi/\)\([^/]*\)\$!if [ -L \1\2\3\4 ] ; then rm \1\2\3\4 ; elif [ \! -e \"\1\3\4\" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 \1\2\3\4 ; elif diff -q \1\3\4 \1\2\3\4 ; then rm \1\2\3\4 ; fi!e" \
-		-e "s!^\(${version}-${release}/\)\([^/]*/\)\(version.info\|pxelinux.0\|grub2pxe\|grub.cfg\|splash.png\|font.pf2\)\$!if [ \! -e \"\1\3\" ] ; then mkdir -p \1 \&\& mv -it \1 \1\2\3 ; elif diff -q \1\3 \1\2\3 ; then rm \1\2\3 ; fi!e" \
+	find "${version}-${release}" \! -type d -print0|\
+	sed -z\
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/boot-screens/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/grub/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/grub/[x864_]*-efi/\)\([^/]*\)\$!if [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/pxelinux.cfg/\)\([^/]*\)\$!if [ -L \1\2\3\4\5\2\6\7 ] ; then rm \1\2\3\4\5\2\6\7 ; elif [ \! -e \"\1\2\6\7\" ] ; then mkdir -p \1\2\6 \&\& mv -it \1\2\6 \1\2\3\4\5\2\6\7 ; elif diff \1\2\6\7 \1\2\3\4\5\2\6\7 ; then rm \1\2\3\4\5\2\6\7 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt\|gtk\)\(/debian-installer/\)\2\(/initrd\)\(\.gz\)\$!if [ \! -e \"\1\2\6-\4\7\" ] ; then mkdir -p \1\2 \&\& mv -i \1\2\3\4\5\2\6\7 \1\2\6-\4\7 ; else echo duplicate; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2\(/[^/]*\)\$!if [ -L \1\2\3\4\5\2\6 ] ; then rm \1\2\3\4\5\2\6 ; elif [ \! -e \"\1\2\6\" ] ; then mkdir -p \1\2 \&\& mv -it \1\2 \1\2\3\4\5\2\6 ; elif diff \1\2\6 \1\2\3\4\5\2\6 ; then rm \1\2\3\4\5\2\6 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt/\|gtk/\)\(debian-installer/\)\2!\1 # \2 # \3 # \4 # \5 # !" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/tmp/\)\(txt\|gtk\)\(/[^/]*\)\$!if [ -L \1\2\3\4\5 ] ; then rm \1\2\3\4\5 ; elif [ \! -e \"\1\2\5\" ] ; then mkdir -p \1\2 \&\& mv -it \1\2 \1\2\3\4\5 ; elif diff \1\2\5 \1\2\3\4\5 ; then rm \1\2\3\4\5 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/boot-screens/\)\([^/]*\)\$!if [ -L \1\2\3\4 ] ; then rm \1\2\3\4 ; elif [ \! -e \"\1\3\4\" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 \1\2\3\4 ; elif diff -q \1\3\4 \1\2\3\4 ; then rm \1\2\3\4 ; fi!e" \
+		-e "s!^\(${version}-${release}"''"/\)\([^/]*\)\(/grub/\)\([^/]*\)\$!if [ -L \1\2\3\4 ] ; then rm \1\2\3\4 ; elif [ \! -e \"\1\3\4\" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 \1\2\3\4 ; elif diff -q \1\3\4 \1\2\3\4 ; then rm \1\2\3\4 ; fi!e" \
+		-e '/^$/d' |\
+	sed -zr \
+		-e "s!^(${version}-${release}"'/)([^/]*)(/grub/[x864_]*-efi/)([^/]*)$!if [ -L "&" ] ; then rm "&" ; elif [ \! -e "&" ] ; then mkdir -p \1\3 \&\& mv -it \1\3 "&" ; elif diff -q \1\3\4 "&" ; then rm "&" ; fi!e' \
+		-e "s!^(${version}-${release}/)([^/]*/)(version.info|pxelinux.0|grub2pxe|grub.cfg|splash.png|font.pf2)"'$!if [ \! -e "&" ] ; then mkdir -p \1 \&\& mv -it \1 "&" ; elif diff -q \1\3 "&" ; then rm "&" ; fi!e' \
 		-e "\!^${version}-${release}/boot-screens/!d" \
 		-e "\!^${version}-${release}/grub/!d" \
-		-e "\!^${version}-${release}/[^/]*/\(linux\|initrd-...\.gz\|kfreebsd-10.gz\)!d" \
-		-e "\!^${version}-${release}/\(version.info\|splash.png\|pxelinux.0\)\$!d" \
+		-e "\!^${version}-${release}"'/[^/]*/(linux|initrd-...\.gz|kfreebsd-10.gz)$!d' \
+		-e "\!^${version}-${release}"'/(version.info|splash.png|pxelinux.0)$!d' \
+		-e '/^$/d' \
 	&& echo ok
 
 	[ -d debian-installer 	     ] && find debian-installer	       -depth -type d -print0|xargs -0r rmdir --ignore-fail-on-non-empty
@@ -130,11 +135,13 @@ function move {
 }
 
 cc=us
+#mirror="http://ftp.${cc}.debian.org/debian"
+mirror="http://space/debian"
 #release=wheezy
 #release=testing
 release=stable
 version=current
 
-download "${cc}" "${release}" "${version}"
+download "${mirror}" "${release}" "${version}"
 move "${release}" "${version}"
 
