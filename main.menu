@@ -299,6 +299,13 @@
 	title	= Power Off
 	type	= exit
 	exit	= poweroff
+[hd]
+	title	= Boot from hard disk
+	only	= ipxe
+	hotkey	= h
+	under	= exit
+	type	= exit
+	exit	= sanboot --no-describe --drive 0x80
 [other]
 	hotkey	= o
 	title	= Other
