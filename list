@@ -21,10 +21,10 @@ d 0 1 auto
 # The fourth coloum is the filename coloum, more on this in a minute.
 # The fifth and later coloums form the display name which is displayed to the user.
 #
-# The filename coloummay be a single dash to indicate that it is empty, a filename without comas or whitespace that is used on
+# The filename coloum may be a single dash to indicate that it is empty, a filename without comas or whitespace that is used on
 # all archetectures, or a coma seperated list of filenames in the order that the archectectures are listed in this file. If there
 # is one more file than archetectures it is used as a fallback instead of the default of the archecture name.
-0 1 auto /debian-installer/powerpc64/./yaboot,EFI32/ipxe.efi NetBoot
+0 1 auto /debian-installer/powerpc/./yaboot,EFI32/ipxe.efi NetBoot
 1 1 auto - NetRestore
 0 2 auto -,- test1
 1 2 auto - test2
