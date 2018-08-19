@@ -1,15 +1,17 @@
 #!/bin/bash -x
+#!/bin/bash
 
 function grub {
 	local grubdir
 	local localedir
 	local dir
 
-	cp -t /tftpboot/grub/ grub.pxe
-
-	# Copy gettext files
 	grubdir=/tftpboot/grub
 	localedir=/usr/share/locale
+
+	cp -t "${grubdir}"/ grub.pxe
+
+	# Copy gettext files
 	mkdir -p "${grubdir}"/locale/
 	for dir in "${localedir}"/*; do
 	    	if test -f "$dir/LC_MESSAGES/grub.mo"; then
@@ -33,54 +35,82 @@ function bs_test {
 	ls debian-installer/*/boot-screens/*.cfg debian-installer/*/boot-screens/*/*.cfg | grep txt | sed -e 's!^\(.*\)\(txt\)\(.*\)$!mv -i \1\2\3 \1gtk\3!e' -e '/^$/d'
 }
 
-function download {
+function download_arch {
+	local mirror
 	local release
 	local version
-	local mirror
+	local arch
 	local quiet
+
+	mirror="$1";shift
+	release="$1";shift
+	version="$1";shift
+	arch="$1";shift
 
 	quiet='--no-check-certificate'
 	#quiet='--no-check-certificate -nv'
+
+	case "$arch" in
+		kfreebsd-*)
+			wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i - << EOF
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot/netboot.tar.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot/gtk/netboot.tar.gz
+
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot-9/netboot.tar.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot-9/gtk/netboot.tar.gz
+EOF
+		#	${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot-10/netboot.tar.gz
+		#	${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot-10/gtk/netboot.tar.gz
+			;;
+		i386|amd64)
+			wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i - << EOF
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot/netboot.tar.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/netboot/gtk/netboot.tar.gz
+EOF
+			;;
+		powerpc)
+			wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer/"${release}" -i - << EOF
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/boot.msg
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/initrd.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/mini.iso
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/vmlinux
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/yaboot
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/yaboot.conf
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/gtk/initrd.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/gtk/mini.iso
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc/netboot/gtk/vmlinux
+
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/boot.msg
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/initrd.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/mini.iso
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/vmlinux
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/yaboot
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/yaboot.conf
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/gtk/initrd.gz
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/gtk/mini.iso
+			${mirror}/dists/${release}/main/installer-${arch}/${version}/images/powerpc64/netboot/gtk/vmlinux
+EOF
+			wget
+			;;
+	esac
+}
+
+function download {
+	local mirror
+	local release
+	local version
+	local arch
+	local quiet
 
 	mirror="$1";shift
 	release="$1";shift
 	version="$1";shift
 
-	false&&wget $quiet -p -x -nH --cut-dirs=4 -P debian-installer/"${release}" -i - << EOF
-	${mirror}/dists/${release}/main/installer-i386/${version}/images/netboot/netboot.tar.gz
-	${mirror}/dists/${release}/main/installer-i386/${version}/images/netboot/gtk/netboot.tar.gz
-	${mirror}/dists/${release}/main/installer-amd64/${version}/images/netboot/netboot.tar.gz
-	${mirror}/dists/${release}/main/installer-amd64/${version}/images/netboot/gtk/netboot.tar.gz
-
-EOF
-#	${mirror}/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/netboot.tar.gz
-#	${mirror}/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/netboot.tar.gz
-#	${mirror}/dists/${release}/main/installer-kfreebsd-amd64/${version}/images/netboot-10/gtk/netboot.tar.gz
-#	${mirror}/dists/${release}/main/installer-kfreebsd-i386/${version}/images/netboot-10/gtk/netboot.tar.gz
-
-	false&&wget $quiet -p -x -nH --cut-dirs=7 -P debian-installer/"${release}" -i - << EOF
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/boot.msg
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/initrd.gz
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/mini.iso
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinux
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/vmlinuz-chrp.initrd
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/yaboot.conf
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/initrd.gz
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/mini.iso
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc/netboot/gtk/vmlinux
-
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/boot.msg
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/initrd.gz
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/mini.iso
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinux
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/vmlinuz-chrp.initrd
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/yaboot.conf
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/initrd.gz
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/mini.iso
-	${mirror}/dists/${release}/main/installer-powerpc/${version}/images/powerpc64/netboot/gtk/vmlinux
-EOF
+	for arch do
+		downlad_arch "${mirror}" "${release}" "${version}" "${arch}"
+	done
 }
 
 function move {
@@ -93,10 +123,10 @@ function move {
 
 	find debian-installer \! -type d -print0|\
 	sed -zr \
-		-e 's!^(debian-installer/${release}/installer-)([^/]*/)(${version}/images/netboot[-0-9]*/)(netboot.tar.gz)$!mkdir -p '"${version}-${release}"'/\2tmp/txt\&\&mv -i "&" '"${version}-${release}"'/\2tmp/txt/\4!e' \
-		-e 's!^(debian-installer/'"${release}"'/installer-)([^/]*/)(${version}/images/netboot[-0-9]*/)(gtk/netboot.tar.gz)$!mkdir -p '"${version}-${release}/\2tmp/gtk\&\&mv -i "&" ${version}-${release}/\2tmp/\4!e" \
-		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(gtk/)([^/]*)$!mkdir -p '"${version}-${release}/\2\&\&mv -i "&" ${version}-${release}/\2gtk-\5!e" \
-		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(vmlinux|mini.iso|initrd.gz)$!mkdir -p '"${version}-${release}/\2\&\&mv -i "&" ${version}-${release}/\2txt-\4!e" \
+		-e 's!^(debian-installer/'"${release}"'/installer-)([^/]*/)('"${version}"'/images/netboot[-0-9]*/)(netboot.tar.gz)$!mkdir -p '"${version}-${release}"'/\2tmp/txt\&\&mv -i "&" '"${version}-${release}"'/\2tmp/txt/\4!e' \
+		-e 's!^(debian-installer/'"${release}"'/installer-)([^/]*/)('"${version}"'/images/netboot[-0-9]*/)(gtk/netboot.tar.gz)$!mkdir -p '"${version}-${release}"'/\2tmp/gtk\&\&mv -i "&" '"${version}-${release}/\2tmp/\4!e" \
+		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(gtk/)([^/]*)$!mkdir -p '"${version}-${release}"'/\2\&\&mv -i "&" '"${version}-${release}/\2gtk-\5!e" \
+		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)(vmlinux|mini.iso|initrd.gz)$!mkdir -p '"${version}-${release}"'/\2\&\&mv -i "&" '"${version}-${release}/\2txt-\4!e" \
 		-e 's!^(debian-installer/'"${release}"'/)([^/]*/)(netboot[-0-9]*/)([^/]*)$!mkdir -p '"${version}-${release}"'/\2\&\&mv -i "&" '"${version}-${release}/\2\4!e" \
 		-e '/^$/d' \
 	&& echo ok
@@ -134,14 +164,52 @@ function move {
 	[ -d "${version}-${release}" ] && find "${version}-${release}" -depth -type d -print0|xargs -0r rmdir --ignore-fail-on-non-empty
 }
 
+function do_version () {
+	local mirror
+	local release
+	local version
+
+	mirror="$1";shift
+	release="$1";shift
+
+	for version ; do
+		echo download "${mirror}" "${release}" "${version}" i386 amd64
+		downlad "${mirror}" "${release}" "${version}" i386 amd64
+		# kfreebsd dropped in jessie - oldstable
+		false && downlad "${mirror}" "${release}" "${version}" kfreebsd-i386 kfreebsd-amd64
+		# powerpc dropped in stretch - stable
+		false && downlad "${mirror}" "${release}" "${version}" powerpc
+		echo move "${release}" "${version}"
+		move "${release}" "${version}"
+	done
+}
+
+function do_release {
+	local mirror
+	local release
+
+	mirror="$1";shift
+
+	for release ; do
+		case "${release}" in
+			*/*)
+
+				#echo do_version "${mirror}" "${release%/*}" "${release##*/}"
+				do_version "${mirror}" "${release%/*}" "${release#*/}"
+				;;
+			*)
+				#echo do_version "${mirror}" "${release}" "current"
+				do_version "${mirror}" "${release}" "current"
+				;;
+		esac
+	done
+}
 cc=us
-#mirror="http://ftp.${cc}.debian.org/debian"
-mirror="http://space/debian"
-#release=wheezy
-#release=testing
-release=stable
-version=current
+mirror="http://ftp.${cc}.debian.org/debian"
+#mirror="http://space/debian"
 
-download "${mirror}" "${release}" "${version}"
-move "${release}" "${version}"
+#do_release "${mirror}" stable
+do_release "${mirror}" testing stable oldstable oldoldstable
 
+# bs_test
+# grub
