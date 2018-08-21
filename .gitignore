@@ -1,3 +1,7 @@
 *.swp
 debian-installer
+current-oldoldstable
+current-oldstable
+current-stable
+current-testing
 
