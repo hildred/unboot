@@ -147,7 +147,7 @@ sub is_path_readable_by_grub($){
 	#warn join ', ', @abstraction;
 	return 0 unless shift @abstraction;
 
-	### todo
+	### TODO
 	#if [ x$GRUB_ENABLE_CRYPTODISK = xy ]; then
 	#	return 0
 	#fi
@@ -174,6 +174,7 @@ sub prepare_grub_to_access_device($){
 		push @line, "insmod part_$_\n";
 	}
 
+	### TODO
 #	loop_file=
 #	case $1 in
 #		/dev/loop/*|/dev/loop[0-9])
@@ -197,6 +198,7 @@ sub prepare_grub_to_access_device($){
 	my @fs=grub_probe_d fs=>$dev;				die unless shift @fs;
 	push @line, "insmod $_\n" foreach(@fs);
 
+	### TODO
 #	if [ x$GRUB_ENABLE_CRYPTODISK = xy ]; then
 #			for uuid in "`"${grub_probe}" --device $@ --target=cryptodisk_uuid`"; do
 #		echo "cryptomount -u $uuid"
@@ -222,6 +224,7 @@ sub prepare_grub_to_access_device($){
 		}
 	}
 
+	### TODO
 #	if [ "x${loop_file}" != x ]; then
 #		loop_mountpoint="$(awk '"'${loop_file}'" ~ "^"$2 && $2 != "/" { print $2 }' /proc/mounts | tail -n1)"
 #		if [ "x${loop_mountpoint}" != x ]; then
@@ -408,6 +411,9 @@ function gfxmode {
 set linux_gfx_mode=
 export linux_gfx_mode
 
+insmod gzio
+if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+
 EOF
 			print {$h} "function load_theme {\n";
 			if($e->{grub_theme} && -f $e->{prefix}.$e->{grub_theme} && is_path_readable($e->{prefix}.$e->{grub_theme})){
@@ -477,7 +483,8 @@ EOF
 }
 
 EOF
-			print {$h} << 'EOF' if 'disk'eq$go{target};
+			if('disk'eq$go{target}){
+				print {$h} << 'EOF';
 if [ -s $prefix/grubenv ]; then
 	load_env
 	set have_grubenv=true
@@ -489,14 +496,19 @@ if [ "${next_entry}" ] ; then
 	save_env next_entry
 	set boot_once=true
 EOF
-			print {$h} << "EOF" if defined $e->{default};
+				print {$h} << "EOF" if defined $e->{default};
 else
 	set default="$e->{default}"
 EOF
-			print {$h} << 'EOF' if 'disk'eq$go{target};
+				print {$h} << 'EOF';
 fi
 
 EOF
+			}elsif(defined $e->{default}){
+				print {$h} << "EOF";
+set default="$e->{default}"
+EOF
+			}
 			print {$h} << 'EOF';
 if [ x"${feature_menuentry_id}" = xy ]; then
 	menuentry_id_option="--id"
@@ -526,7 +538,7 @@ else
 fi
 
 EOF
-			print {$h} ('	'x$o), "load_video \"$e->{lang}\"\n";
+			print {$h} ('	'x$o), 'load_video',($e->{lang}?' "'.$e->{lang}.'"':()),"\n";
 			print {$h} ('	'x$o), "start_ser\n\n";
 		},
 		gap=>sub{
@@ -778,8 +790,51 @@ EOF
 		}
 	},
 	ipxe=>{
+		config=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
+			if(defined $e->{npreseed}){
+				$e->{snpreseed}=$e->{npreseed};
+				$e->{snpreseed}=~s!^.*/!!;
+			}
+			print {$h} 'isset ${'.$_.'} || set '.$_.' '.$e->{$_}."\n" foreach (grep {$e->{$_}} qw(
+				video debug preseed npreseed snpreseed desktop default timeout
+				dvideo dmode
+			));
+			print {$h} "\n";
+			print {$h} 'isset ${'.$_.'} || set '.$_.' '.$e->{$_}."\n" foreach (grep {$e->{$_}} qw(
+				vid dpreseed ddesktop
+			));
+			print {$h} << 'EOF';
+isset ${vid} || set vid ${video}
+isset ${dpreseed} || set dpreseed url=${preseed}
+isset ${ddesktop} || set ddesktop desktop=${desktop}
+EOF
+			print {$h} "\n";
+		},
 		out=>sub (\*){
 			my $h=shift;
+			#do_menu(ipxe=>menu=>*$h,menu=>0);
+			print {$h} << 'EOF';
+console --picture splash.png || console --picture splash.pgm ||
+set pxe_default_server ${next-server}
+cpuid --ext 29 && set arch amd64 || set arch i386
+cpuid 6 && set pae yes ||
+cpuid --ext 29 && set xarch amd64 || cpuid 6 && set xarch i686-pae || set xarch i586
+cpuid --ecx 5 && set vmx yes ||
+cpuid --ext --ecx 2 && set svm yes ||
+isset ${vmx} || isset ${svm} && set hw_virt yes ||
+set esc:hex 1b
+set lf:hex 0a
+set space:hex 20
+
+EOF
 			print {$h} qq(:menu\nmenu --name menu\n);
 			do_menu(ipxe1=>menu=>*$h,menu=>0);
 			print {$h} qq(choose --menu menu target || exit\nmenu --name menu --delete\ngoto \${target}\n\n);
@@ -795,6 +850,7 @@ EOF
 		}
 	},
 	ipxe1=>{
+		config2=>sub{},
 		config=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
@@ -804,20 +860,6 @@ EOF
 			$menudomain{$e->{file}}=$e->{msgset} if $e->{msgset};
 			warn __("class unimplemented") if defined $e->{class};
 			warn __("security unimplemented") if defined $e->{users};
-			print {$h} << 'EOF';
-console --picture splash.png || console --picture splash.pgm ||
-set pxe_default_server ${next-server}
-cpuid --ext 29 && set arch amd64 || set arch i386
-cpuid 6 && set pae yes ||
-cpuid --ext 29 && set xarch amd64 || cpuid 6 && set xarch i686-pae || set xarch i586
-cpuid --ecx 5 && set vmx yes ||
-cpuid --ext --ecx 2 && set svm yes ||
-isset ${vmx} || isset ${svm} && set hw_virt yes ||
-set space:hex 20
-set lf:hex 0a
-set esc:hex 1b
-
-EOF
 			if(defined $e->{npreseed}){
 				$e->{snpreseed}=$e->{npreseed};
 				$e->{snpreseed}=~s!^.*/!!;
@@ -878,7 +920,28 @@ EOF
 			print {$h} 'item ',_f('--menu %s ',$t),
 				_f('--key %s ',$e->{hotkey}),
 				($e->{default}?"--default ":''),
-				qq($e->{tag}\t$e->{title}\n);
+				qq($e->{tag}\t$e->{title}\n) unless $e->{hidden};
+		},
+		'value-read'=>sub{
+			my $h=shift; #handle
+			my $e=shift; #entry
+			my $t=shift;
+			my $o=shift;
+
+			warn __("class unimplemented") if defined $e->{class};
+			warn __("security unimplemented") if defined $e->{users};
+			$e->{tag}=$e->{value} if defined $e->{value};
+			unless(defined $e->{hotkey}){
+			}elsif($e->{title}=~s/^($e->{hotkey})/($1)/i){
+			}elsif($e->{title}=~s/ ($e->{hotkey})/ ($1)/i){
+			}elsif($e->{title}=~s/($e->{hotkey})/($1)/i){
+			}else{
+				warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
+			}
+			print {$h} 'item ',_f('--menu %s ',$t),
+				_f('--key %s ',$e->{hotkey}),
+				($e->{default}?"--default ":''),
+				qq($e->{tag}\t$e->{title}\n) unless $e->{hidden};
 		},
 	},
 	ipxe2=>{
@@ -886,6 +949,7 @@ EOF
 		gap=>sub{},
 		gapvar=>sub{},
 		value=>sub{},
+		'value-read'=>sub{},
 		sanboot=>sub{
 			my $h=shift; #handle
 			my $e=shift; #entry
@@ -938,7 +1002,7 @@ EOF
 
 			print {$h} q(:),$e->{tag};
 			print {$h} qq(\necho	Loading kernel ...\nimgstat\nshell\n);
-			warn __("unfinished code");
+			warn __("kfreebsd may not work");
 				print {$h} qq(kernel	$e->{kernel});
 				print {$h} qq( $e->{command}) if defined $e->{command};
 ################################################################################
@@ -1246,7 +1310,10 @@ $i{ipxe1}{basic}=sub{
 	my $o=shift;
 
 	warn __("class unimplemented") if defined $e->{class};
-	warn __("security unimplemented") if defined $e->{users};
+	if(defined $e->{users}){
+		warn __("security partially implemented");
+		return;
+	}
 	#todo kfreebsd
 	if('kfreebsd'eq$e->{type}){
 		return;
@@ -1276,7 +1343,7 @@ $i{ipxe1}{basic}=sub{
 		warn sprintf __("unmarked hotkey on %s: %s"),$e->{tag}, $e->{title};
 	}
 	print {$h} q(isset ${),$e->{condition},q(} && ) if $e->{condition};
-	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title} ||\n);
+	print {$h} q(item ),($t?"--menu $t ":''),($e->{hotkey}?"--key $e->{hotkey} ":''),($e->{default}?"--default ":''),$e->{tag},qq(	$e->{title} ||\n) unless $e->{hidden};
 };
 $i{ipxe2}{basic}=sub{
 	my $h=shift; #handle
@@ -1334,9 +1401,6 @@ sub out($\*){
 	die __("Unknown format requested") unless defined $i{$t};
 ################################################################################
 	printf {$h} __(qq(#!%s\n#\n# DO NOT EDIT THIS FILE\n#\n# It is automatically generated by unboot.\n#\n\n### BEGIN %s: %s ###\n)), $t, $0, $ARGV unless 'pot'eq$t;
-	#open my $lib, '<', $t.'.lib' or die;
-	#print {$h} $_ while(<$lib>);
-	#close $lib;
 	$i{$t}{out}($h);
 	printf {$h} __(qq(### END %s: %s ###\n)),$0,$ARGV unless 'pot'eq$t;
 }
