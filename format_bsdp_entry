@@ -173,20 +173,20 @@ eof
 			if not exists ipxe.http {
 				log(debug, "4.%1$d.old.tftp");
 				filename "%5$sipxe.%4$s";
-			}elsif not exists dhcp-server-identifier {
+			}elsif exists dhcp-server-identifier {
 eof
 					}else{
 						push @c, <<'eof';
-			if not exists dhcp-server-identifier {
+			if exists dhcp-server-identifier {
 eof
 					}
 					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.old.http");
+				filename = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s");
+			}else{
 				log(debug, "4.%1$d.old.broken");
 				log(debug, "no server identifier");
 				filename "http://%3$s/tftpboot/%5$sipxe.%4$s";
-			}else{
-				log(debug, "4.%1$d.old.http");
-				filename = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/%5$sipxe.%4$s");
 			}
 		}elsif substring(option ipxe.busid,0,1)=1 {
 			#log(debug, "3.%1$d.pci");
@@ -196,20 +196,20 @@ eof
 			if not exists ipxe.http {
 				log(debug, "4.%1$d.pci.tftp");
 				filename= concat("/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
-			}elsif not exists dhcp-server-identifier {
+			}elsif exists dhcp-server-identifier {
 eof
 					}else{
 						push @c, <<'eof';
-			if not exists dhcp-server-identifier {
+			if exists dhcp-server-identifier {
 eof
 					}
 					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.pci.http");
+				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
+			}else{
 				log(debug, "4.%1$d.pci.broken");
 				log(debug, "no server identifier");
 				filename= concat("http://%3$s/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
-			}else{
-				log(debug, "4.%1$d.pci.http");
-				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/pci/",binary-to-ascii(16,32,":",substring(option ipxe.busid,1,99)),".%4$s");
 			}
 		}else{
 			#log(debug, "3.%1$d.other");
@@ -219,20 +219,20 @@ eof
 			if not exists ipxe.http {
 				log(debug, "4.%1$d.other.tftp");
 				filename= concat("/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
-			}elsif not exists dhcp-server-identifier {
+			}elsif exists dhcp-server-identifier {
 eof
 					}else{
 						push @c, <<'eof';
-			if not exists dhcp-server-identifier {
+			if exists dhcp-server-identifier {
 eof
 					}
 					push @c, sprintf <<'eof', $a, $b, $ip, @{$vals[$a]};
+				log(debug, "4.%1$d.other.http");
+				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
+			}else{
 				log(debug, "4.%1$d.other.broken");
 				log(debug, "no server identifier");
 				filename= concat("http://%3$s/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
-			}else{
-				log(debug, "4.%1$d.other.http");
-				filename= concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/ipxe/other/",binary-to-ascii(16,8,":",option ipxe.busid),".%4$s");
 			}
 		}
 eof
@@ -724,11 +724,11 @@ if substring (option vendor-class-identifier, 0, 9) = "PXEClient" {
 	}
 
 	if not exists ipxe.http {
-	}elsif not exists dhcp-server-identifier {
+	}elsif exists dhcp-server-identifier {
+		option pxelinux.pathprefix = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
+	}else{
 		log(debug, "no server identifier");
 		option pxelinux.pathprefix "http://$ip/tftpboot/";
-	}else{
-		option pxelinux.pathprefix = concat("http://", binary-to-ascii(10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
 	}
 
 	if (
@@ -748,9 +748,9 @@ if substring (option vendor-class-identifier, 0, 9) = "PXEClient" {
 		option ipxe.no-pxedhcp 1;
 		if exists dhcp-server-identifier {
 			filename = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/ipxe/boot.ipxe");
-			option pxelinux.pathprefix = concat("http://", binary-to-ascii ( 10, 8, ".", option dhcp-server-identifier), "/tftpboot/");
 		} else {
 			log(debug, "no server identifier");
+			filename = "boot.ipxe";
 		}
 	} elsif not exists client-arch {
 		log(debug, "2.unk");
